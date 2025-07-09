@@ -12,7 +12,9 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel }) => {
   const fetchCandles = async (timeframe = selectedTimeframe) => {
     if (!symbol) return;
     try {
-      const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=100`);
+      // Используем percentileWindow + 50 для достаточного количества данных для расчета сигналов
+      const limit = Math.max(100, (percentileWindow || 50) + 50);
+      const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=${limit}`);
       const data = await res.json();
       setCandles(
         data.map(k => ({
@@ -32,7 +34,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel }) => {
   // Первоначальная загрузка данных
   useEffect(() => {
     fetchCandles(selectedTimeframe);
-  }, [symbol, selectedTimeframe]);
+  }, [symbol, selectedTimeframe, percentileWindow]);
 
   // Автоматическое обновление каждую минуту
   useEffect(() => {
@@ -40,35 +42,49 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel }) => {
     
     const interval = setInterval(() => {
       fetchCandles(selectedTimeframe);
-    }, 60000); // 60 секунд
+    }, 15000); // 15 секунд для более быстрого отклика
 
     return () => clearInterval(interval);
-  }, [symbol, selectedTimeframe]);
+  }, [symbol, selectedTimeframe, percentileWindow]);
 
   useEffect(() => {
-    if (!candles || candles.length < 51) {
+    if (!candles || candles.length < (percentileWindow || 50) + 1) {
       setSignalMarkers([]);
       return;
     }
-    const engine = new VolumeSignalEngine(percentileWindow || 50, 50, 50, percentileLevel || 5);
-    const markers = [];
     
-    // Обрабатываем только закрытые бары (как в TradingView barstate.isconfirmed)
-    for (let i = 0; i < candles.length - 1; i++) {
-      const bar = candles[i];
-      // Обновляем движок только для закрытых баров
-      const res = engine.checkSignals(bar.volume);
-      if (res.percentileSignal) {
+    const markers = [];
+    const volumes = candles.map(c => c.volume);
+    
+    // Обрабатываем только закрытые бары, исключая последнюю формирующуюся свечу
+    for (let i = percentileWindow || 50; i < candles.length - 1; i++) {
+      const currentVolume = volumes[i];
+      
+      // Берем исторические данные для расчета процентиля (исключая текущую и последующие свечи)
+      const historicalVolumes = volumes.slice(Math.max(0, i - (percentileWindow || 50)), i);
+      const sorted = [...historicalVolumes].sort((a, b) => a - b);
+      
+      // Рассчитываем процентиль для текущей свечи
+      let rank = 0;
+      for (let j = 0; j < sorted.length; j++) {
+        if (sorted[j] < currentVolume) rank++;
+        else break;
+      }
+      const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
+      const hasSignal = percentileRank <= (percentileLevel || 5);
+      
+      if (hasSignal) {
         markers.push({
-          time: bar.time,
+          time: candles[i].time,
           position: 'aboveBar',
           color: '#38bdf8',
           shape: 'circle',
         });
       }
     }
+    
     setSignalMarkers(markers.slice(-50));
-  }, [candles]);
+  }, [candles, percentileWindow, percentileLevel]);
 
 return (
   <div style={{ 

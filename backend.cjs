@@ -55,12 +55,12 @@ const clientSignals = new Map();  // ws -> signals
 let cachedSignals = [];
 let cachedAt = 0;
 
-// Фоновое обновление кэша раз в минуту
+// Фоновое обновление кэша каждые 15 секунд для более быстрого отклика
 async function updateCachedSignals() {
   cachedSignals = await calculateSignals(DEFAULT_PERCENTILE_WINDOW, DEFAULT_PERCENTILE_LEVEL);
   cachedAt = Date.now();
 }
-setInterval(updateCachedSignals, 60 * 1000);
+setInterval(updateCachedSignals, 15 * 1000); // 15 секунд вместо 60
 updateCachedSignals();
 
 // Основная функция расчёта сигналов (может вызываться с разными параметрами)

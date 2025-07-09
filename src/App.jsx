@@ -13,6 +13,42 @@ import LightweightChart from './components/LightweightChart_CDN.jsx';
 import MultiChart from './components/MultiChart';
 import { VolumeSignalEngine } from './utils/signalEngine';
 
+// Компонент для отображения текущего времени
+const CurrentTime = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div style={{
+      color: '#00ff41',
+      fontFamily: 'monospace',
+      fontSize: '16px',
+      fontWeight: 'bold',
+      textShadow: '0 0 3px #00ff41',
+      padding: '8px 16px',
+      background: '#000',
+      border: '1px solid #333',
+      borderRadius: '6px',
+      minWidth: '90px',
+      textAlign: 'center'
+    }}>
+      {time.toLocaleTimeString('ru-RU', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })}
+    </div>
+  );
+};
+
 const tfList = ["1m", "3m", "5m", "15m", "30m"];
 
 function App() {
@@ -277,7 +313,7 @@ useEffect(() => {
     }
     intervalId = setInterval(() => {
       if (!closed) fetchUpdate();
-    }, 60000); // 60 секунд
+    }, 15000); // 15 секунд для более быстрого отклика
     // Первый вызов сразу
     fetchUpdate();
     return () => {
@@ -295,7 +331,9 @@ useEffect(() => {
       if (!symbol) return setCandles([]);
       try {
         const interval = '5m';
-        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=100`);
+        // Используем appliedPercentileWindow + 50 для достаточного количества данных для расчета сигналов
+        const limit = Math.max(100, appliedPercentileWindow + 50);
+        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
         const data = await res.json();
         setCandles(
           data.map(k => ({
@@ -316,31 +354,45 @@ useEffect(() => {
     } else {
       setCandles([]);
     }
-  }, [signals]);
+  }, [signals, appliedPercentileWindow]);
 
   // Вычисление сигналов для последних 50 закрытых свечей
   useEffect(() => {
-    if (!candles || candles.length < 51) {
+    if (!candles || candles.length < appliedPercentileWindow + 1) {
       setSignalMarkers([]);
       return;
     }
-    // Используем актуальные параметры (синхронизация с таблицей)
-    const engine = new VolumeSignalEngine(appliedPercentileWindow, 50, 50, appliedPercentileLevel);
+    
     const markers = [];
-    // Прогоняем по всем свечам, кроме последней (она формируется)
-    for (let i = 0; i < candles.length - 1; i++) {
-      const bar = candles[i];
-      const res = engine.checkSignals(bar.volume);
-      // Сигнал только по процентилю
-      if (res.percentileSignal) {
+    const volumes = candles.map(c => c.volume);
+    
+    // Обрабатываем только закрытые бары, исключая последнюю формирующуюся свечу
+    for (let i = appliedPercentileWindow; i < candles.length - 1; i++) {
+      const currentVolume = volumes[i];
+      
+      // Берем исторические данные для расчета процентиля (исключая текущую и последующие свечи)
+      const historicalVolumes = volumes.slice(Math.max(0, i - appliedPercentileWindow), i);
+      const sorted = [...historicalVolumes].sort((a, b) => a - b);
+      
+      // Рассчитываем процентиль для текущей свечи
+      let rank = 0;
+      for (let j = 0; j < sorted.length; j++) {
+        if (sorted[j] < currentVolume) rank++;
+        else break;
+      }
+      const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
+      const hasSignal = percentileRank <= appliedPercentileLevel;
+      
+      if (hasSignal) {
         markers.push({
-          time: bar.time,
+          time: candles[i].time,
           position: 'aboveBar',
           color: '#38bdf8',
           shape: 'circle',
         });
       }
     }
+    
     // Берём только последние 50 закрытых свечей
     setSignalMarkers(markers.slice(-50));
   }, [candles, appliedPercentileWindow, appliedPercentileLevel]);
@@ -437,99 +489,104 @@ useEffect(() => {
 ██████╔╝██║██║ ╚████║██║  ██║██║ ╚████║╚██████╗███████╗    ███████║██║╚██████╔╝██║ ╚████║██║  ██║███████╗███████║
 ╚═════╝ ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝╚══════╝    ╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚══════╝`}
         </pre>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 12 }}>
-          <button onClick={() => setActiveTab('alt')} style={{
-            padding: '4px 16px',
-            fontWeight: 500,
-            background: activeTab === 'alt' ? '#e91e63' : '#c2185b',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-            boxShadow: activeTab === 'alt' ? '0 0 4px #e91e63' : '0 0 2px #c2185b'
-          }}>Графики</button>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: '#222', borderRadius: '6px', border: '1px solid #333' }}>
-              <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
-                Окно:
-                <input
-                  type="number"
-                  min={5}
-                  max={200}
-                  value={percentileWindow}
-                  onChange={e => setPercentileWindow(Number(e.target.value))}
-                  style={{ 
-                    width: 50, 
-                    marginLeft: 6,
-                    padding: '3px 6px',
-                    background: '#333',
-                    border: '1px solid #555',
-                    borderRadius: '3px',
-                    color: '#fff',
-                    fontSize: '13px'
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <button onClick={() => setActiveTab('alt')} style={{
+              padding: '4px 16px',
+              fontWeight: 500,
+              background: activeTab === 'alt' ? '#e91e63' : '#c2185b',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'alt' ? '0 0 4px #e91e63' : '0 0 2px #c2185b'
+            }}>Графики</button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: '#222', borderRadius: '6px', border: '1px solid #333' }}>
+                <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
+                  Окно:
+                  <input
+                    type="number"
+                    min={5}
+                    max={200}
+                    value={percentileWindow}
+                    onChange={e => setPercentileWindow(Number(e.target.value))}
+                    style={{
+                      width: 50,
+                      marginLeft: 6,
+                      padding: '3px 6px',
+                      background: '#333',
+                      border: '1px solid #555',
+                      borderRadius: '3px',
+                      color: '#fff',
+                      fontSize: '13px'
+                    }}
+                  />
+                </label>
+                <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
+                  Порог (%):
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={percentileLevel}
+                    onChange={e => setPercentileLevel(Number(e.target.value))}
+                    style={{
+                      width: 45,
+                      marginLeft: 6,
+                      padding: '3px 6px',
+                      background: '#333',
+                      border: '1px solid #555',
+                      borderRadius: '3px',
+                      color: '#fff',
+                      fontSize: '13px'
+                    }}
+                  />
+                </label>
+                <button
+                  onClick={() => {
+                    setAppliedPercentileWindow(percentileWindow);
+                    setAppliedPercentileLevel(percentileLevel);
+                    setReloadKey(k => k + 1);
                   }}
-                />
-              </label>
-              <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
-                Порог (%):
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={percentileLevel}
-                  onChange={e => setPercentileLevel(Number(e.target.value))}
-                  style={{ 
-                    width: 45, 
-                    marginLeft: 6,
-                    padding: '3px 6px',
-                    background: '#333',
-                    border: '1px solid #555',
-                    borderRadius: '3px',
+                  style={{
+                    padding: '5px 12px',
+                    fontWeight: 500,
+                    background: '#1976d2',
                     color: '#fff',
-                    fontSize: '13px'
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    boxShadow: '0 2px 4px rgba(25, 118, 210, 0.3)',
+                    marginRight: '10px'
                   }}
-                />
-              </label>
-              <button 
-                onClick={() => {
-                  setAppliedPercentileWindow(percentileWindow);
-                  setAppliedPercentileLevel(percentileLevel);
-                  setReloadKey(k => k + 1);
-                }} 
-                style={{ 
-                  padding: '5px 12px', 
-                  fontWeight: 500,
-                  background: '#1976d2',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  boxShadow: '0 2px 4px rgba(25, 118, 210, 0.3)',
-                  marginRight: '10px'
-                }}
-              >
-                Применить
-              </button>
-              <button 
-                onClick={() => setSoundEnabled(!soundEnabled)} 
-                style={{ 
-                  padding: '5px 12px', 
-                  fontWeight: 500,
-                  background: soundEnabled ? '#4caf50' : '#f44336',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  boxShadow: `0 2px 4px ${soundEnabled ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)'}`
-                }}
-              >
-                {soundEnabled ? 'Выключить звук' : 'Включить звук'}
-              </button>
+                >
+                  Применить
+                </button>
+                <button
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  style={{
+                    padding: '5px 12px',
+                    fontWeight: 500,
+                    background: soundEnabled ? '#4caf50' : '#f44336',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    boxShadow: `0 2px 4px ${soundEnabled ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)'}`
+                  }}
+                >
+                  {soundEnabled ? 'Выключить звук' : 'Включить звук'}
+                </button>
+              </div>
             </div>
           </div>
+          
+          {/* Часы справа */}
+          <CurrentTime />
         </div>
       </div>
       {/* TAB CONTENTS */}        {activeTab === 'signals' && (

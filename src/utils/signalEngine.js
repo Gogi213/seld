@@ -21,6 +21,13 @@ export class VolumeSignalEngine {
     return arr.reduce((a, b) => a + b, 0) / arr.length;
   }
 
+  getPercentileValue() {
+    if (this.volumes.length < this.percentileWindow) return null;
+    const sorted = [...this.volumes].sort((a, b) => a - b);
+    const idx = Math.round(this.percentileLevel / 100 * (sorted.length - 1));
+    return sorted[idx];
+  }
+
   getPercentileRank(volume) {
     if (this.volumes.length < this.percentileWindow) return null;
     const sorted = [...this.volumes].sort((a, b) => a - b);
