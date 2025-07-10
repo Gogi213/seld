@@ -914,11 +914,10 @@ useEffect(() => {
                       alignItems: 'center',
                       gap: '8px'
                     }}>
-                      <span>{coin.symbol}</span>
                       <span style={{
-                        fontSize: '11px',
-                        color: '#aaa',
-                        fontWeight: 400
+                        fontSize: '14px',
+                        color: '#fff',
+                        fontWeight: 600
                       }}>
                         nATR: {coin.natr30m?.toFixed(2) || 'N/A'}
                       </span>

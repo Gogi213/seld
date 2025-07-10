@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 500 }) => {
+const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 500, symbol = '' }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef();
   const seriesRef = useRef();
@@ -110,6 +110,15 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
             style: 3,
             labelBackgroundColor: '#4c525e',
           },
+        },
+        watermark: {
+          visible: !!symbol,
+          fontSize: 38,
+          color: 'rgba(255,255,255,0.10)',
+          text: symbol,
+          horzAlign: 'center',
+          vertAlign: 'top',
+          fontFamily: 'monospace',
         },
       });
       
