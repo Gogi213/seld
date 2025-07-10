@@ -49,19 +49,70 @@ async function get24hTickers() {
   return res.data;
 }
 
-async function getHistoricalKlines(symbol, limit = 1500) {
-  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=${limit}`;
-  const res = await axios.get(url);
-  return res.data.map(k => ({
-    openTime: k[0],
-    open: +k[1],
-    high: +k[2],
-    low: +k[3],
-    close: +k[4],
-    volume: +k[5],
-    quoteVolume: +k[7],
-    trades: +k[8]
-  }));
+async function getHistoricalKlines(symbol, totalLimit = 4000) {
+  const maxPerRequest = 1500;
+  const allKlines = [];
+  
+  // Если нужно меньше 1500, делаем один запрос
+  if (totalLimit <= maxPerRequest) {
+    const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=${totalLimit}`;
+    const res = await axios.get(url);
+    return res.data.map(k => ({
+      openTime: k[0],
+      open: +k[1],
+      high: +k[2],
+      low: +k[3],
+      close: +k[4],
+      volume: +k[5],
+      quoteVolume: +k[7],
+      trades: +k[8]
+    }));
+  }
+  
+  // Для больших объемов делаем несколько запросов
+  let remaining = totalLimit;
+  let endTime = Date.now();
+  
+  while (remaining > 0 && allKlines.length < totalLimit) {
+    const currentLimit = Math.min(remaining, maxPerRequest);
+    
+    try {
+      const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=${currentLimit}&endTime=${endTime}`;
+      const res = await axios.get(url);
+      
+      if (!res.data || res.data.length === 0) break;
+      
+      const klines = res.data.map(k => ({
+        openTime: k[0],
+        open: +k[1],
+        high: +k[2],
+        low: +k[3],
+        close: +k[4],
+        volume: +k[5],
+        quoteVolume: +k[7],
+        trades: +k[8]
+      }));
+      
+      // Добавляем в начало массива (более старые данные)
+      allKlines.unshift(...klines);
+      
+      // Обновляем endTime для следующего запроса (берем время первой свечи минус 1 мс)
+      endTime = klines[0].openTime - 1;
+      remaining -= klines.length;
+      
+      // Небольшая задержка между запросами чтобы не превысить лимиты API
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error) {
+      console.error(`Error fetching batch for ${symbol}:`, error.message);
+      break;
+    }
+  }
+  
+  // Сортируем по времени и возвращаем нужное количество
+  return allKlines
+    .sort((a, b) => a.openTime - b.openTime)
+    .slice(-totalLimit);
 }
 
 // Обновление списка активных символов
@@ -86,7 +137,7 @@ async function updateActiveSymbols() {
       
       try {
         // Получаем больше исторических данных для лучшей агрегации
-        const historicalKlines = await getHistoricalKlines(symbol, 1500);
+        const historicalKlines = await getHistoricalKlines(symbol, 4000);
         if (historicalKlines.length < 30) continue;
         
         // Рассчитываем NATR на последних 30 свечах
@@ -232,15 +283,17 @@ function generateClientData(percentileWindow, percentileLevel) {
       // Рассчитываем максимально доступное количество свечей для каждого таймфрейма
       let maxCandles;
       switch(tf) {
-        case '1m': maxCandles = 1500; break;  // Все загруженные свечи
-        case '5m': maxCandles = 300; break;   // 1500/5 = 300
-        case '15m': maxCandles = 100; break;  // 1500/15 = 100
-        case '30m': maxCandles = 50; break;   // 1500/30 = 50
-        case '1h': maxCandles = 25; break;    // 1500/60 = 25
-        default: maxCandles = 300;
+        case '1m': maxCandles = 4000; break;  // Все загруженные свечи
+        case '5m': maxCandles = 800; break;   // 4000/5 = 800
+        case '15m': maxCandles = 266; break;  // 4000/15 ≈ 266
+        case '30m': maxCandles = 133; break;  // 4000/30 ≈ 133
+        case '1h': maxCandles = 66; break;    // 4000/60 ≈ 66
+        default: maxCandles = 800;
       }
       
-      const candles = candleAggregator.getAggregatedCandles(symbol, tf, maxCandles);
+      // Для 1m используем максимально доступное количество свечей
+      const actualLimit = tf === '1m' ? 4000 : maxCandles;
+      const candles = candleAggregator.getAggregatedCandles(symbol, tf, actualLimit);
       candleData[symbol][tf] = candles.map(c => ({
         time: Math.floor(c.openTime / 1000), // TradingView формат
         open: c.open,

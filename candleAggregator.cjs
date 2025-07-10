@@ -7,8 +7,8 @@ class CandleAggregator {
     this.minuteCandles = new Map(); // symbol -> array of 1m candles
     // Кэш агрегированных данных
     this.aggregatedCache = new Map(); // symbol_timeframe -> array of candles
-    // Максимальное количество 1m свечей для хранения (25 часов = 1500 минут)
-    this.maxMinuteCandles = 1500;
+    // Максимальное количество 1m свечей для хранения (около 2.7 дней = 4000 минут)
+    this.maxMinuteCandles = 4000;
   }
 
   // Добавить новую 1-минутную свечу
@@ -52,7 +52,7 @@ class CandleAggregator {
   }
 
   // Получить агрегированные свечи для указанного таймфрейма
-  getAggregatedCandles(symbol, timeframe, limit = 100) {
+  getAggregatedCandles(symbol, timeframe, limit = 4000) {
     const cacheKey = `${symbol}_${timeframe}`;
     
     // Проверяем кэш

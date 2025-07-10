@@ -8,6 +8,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
 
   // Проверяем, что мы на клиенте
   useEffect(() => {
@@ -65,6 +66,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Создание графика только один раз
   useEffect(() => {
     if (!chartContainerRef.current || !isLoaded || !isClient || !window.LightweightCharts) return;
 
@@ -72,6 +74,9 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
     const actualHeight = height === "100%" ? containerSize.height : parseInt(height);
 
     if (actualWidth <= 0 || actualHeight <= 0) return;
+
+    // Создаем график только если его еще нет
+    if (chartRef.current) return;
 
     try {
       chartRef.current = window.LightweightCharts.createChart(chartContainerRef.current, {
@@ -85,7 +90,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
           vertLines: { color: '#222' },
           horzLines: { color: '#222' },
         },
-        timeScale: { 
+        timeScale: {
           borderColor: '#444',
           timeVisible: true,
           secondsVisible: false,
@@ -136,9 +141,9 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
         borderVisible: false,
       });
       
+      // Сразу загружаем данные если они есть
       if (data && data.length) {
         seriesRef.current.setData(data);
-        // volume data
         const volumeData = data.map(bar => ({
           time: bar.time,
           value: bar.volume || 0,
@@ -147,10 +152,14 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
         volumeSeriesRef.current.setData(volumeData);
       }
       
-      // Добавляем маркеры сигналов
+      // Сразу добавляем маркеры если они есть
       if (signalMarkers && signalMarkers.length) {
         seriesRef.current.setMarkers(signalMarkers);
       }
+      
+      // Отмечаем график как готовый
+      setChartReady(true);
+      
     } catch (error) {
       console.error('❌ Ошибка создания графика:', error);
     }
@@ -158,34 +167,80 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
     return () => {
       if (chartRef.current) {
         chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+        volumeSeriesRef.current = null;
+        setChartReady(false);
       }
     };
-  }, [data, isLoaded, isClient, containerSize.width, containerSize.height, signalMarkers, width, height]);
+  }, [isLoaded, isClient, containerSize.width, containerSize.height, width, height]);
+
+  // Обновление данных без пересоздания графика
+  useEffect(() => {
+    if (!chartRef.current || !seriesRef.current || !volumeSeriesRef.current) return;
+
+    if (data && data.length) {
+      seriesRef.current.setData(data);
+      // volume data
+      const volumeData = data.map(bar => ({
+        time: bar.time,
+        value: bar.volume || 0,
+        color: bar.close > bar.open ? '#cccccc' : '#999999',
+      }));
+      volumeSeriesRef.current.setData(volumeData);
+    }
+  }, [data]);
+
+  // Обновление маркеров сигналов отдельно
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    if (signalMarkers && signalMarkers.length) {
+      seriesRef.current.setMarkers(signalMarkers);
+    } else {
+      seriesRef.current.setMarkers([]);
+    }
+  }, [signalMarkers]);
+
+  // Обновление размеров графика
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const actualWidth = width === "100%" ? containerSize.width : parseInt(width);
+    const actualHeight = height === "100%" ? containerSize.height : parseInt(height);
+
+    if (actualWidth > 0 && actualHeight > 0) {
+      chartRef.current.applyOptions({
+        width: actualWidth,
+        height: actualHeight,
+      });
+    }
+  }, [containerSize.width, containerSize.height, width, height]);
 
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }}>
       {!isClient && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          width: '100%', 
-          height: '100%', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
           color: '#DDD',
-          fontSize: '16px' 
+          fontSize: '14px'
         }}>
           Серверный рендеринг...
         </div>
       )}
-      {isClient && !isLoaded && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          width: '100%', 
-          height: '100%', 
+      {isClient && (!isLoaded || !chartReady) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
           color: '#DDD',
-          fontSize: '16px' 
+          fontSize: '14px'
         }}>
           Загрузка графика...
         </div>
