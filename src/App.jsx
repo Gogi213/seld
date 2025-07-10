@@ -49,7 +49,7 @@ const CurrentTime = () => {
   );
 };
 
-const tfList = ["1m", "3m", "5m", "15m", "30m"];
+const tfList = ["1m", "5m", "15m", "30m", "1h"];
 
 function App() {
   const [signals, setSignals] = useState([]);
@@ -67,6 +67,7 @@ function App() {
   const [candles, setCandles] = useState([]);
   const [signalMarkers, setSignalMarkers] = useState([]);
   const [soundEnabled, setSoundEnabled] = useState(true); // включить/выключить звук
+  const [candleData, setCandleData] = useState({}); // данные свечей для всех символов
   
   // Функция для воспроизведения звука
   const playSignalSound = () => {
@@ -80,6 +81,98 @@ function App() {
     } catch (e) {
       console.log('Ошибка при создании Audio:', e);
     }
+  };
+
+  // Функция для проверки новых сигналов и воспроизведения звука
+  const checkForNewSignals = (oldSignal, newSignal, playSound = false) => {
+    let hasNewActiveSignals = false;
+    
+    if (oldSignal) {
+      tfList.forEach(tf => {
+        const oldHasActiveSignal = oldSignal[`percentileSignal_${tf}`];
+        const newHasActiveSignal = newSignal[`percentileSignal_${tf}`];
+        const newHasExpiredSignal = newSignal[`percentileSignalExpired_${tf}`];
+        
+        // Новый активный сигнал появился (и он НЕ протухший)
+        if (!oldHasActiveSignal && newHasActiveSignal && !newHasExpiredSignal) {
+          // Звук только для 5m, 15m, 30m, 1h (исключаем 1m)
+          if (tf !== '1m') {
+            hasNewActiveSignals = true;
+          }
+          console.log(`🐸 Новый АКТИВНЫЙ сигнал: ${newSignal.symbol} на ${tf} (${newSignal[`percentileRank_${tf}`]?.toFixed(1)}%) ${tf === '1m' ? '(без звука)' : ''}`);
+        }
+        
+        // Логируем протухшие сигналы отдельно (без звука)
+        const oldHasExpiredSignal = oldSignal[`percentileSignalExpired_${tf}`];
+        if (!oldHasExpiredSignal && newHasExpiredSignal) {
+          console.log(`⚠️ Протухший сигнал: ${newSignal.symbol} на ${tf} (${newSignal[`percentileRank_${tf}`]?.toFixed(1)}%)`);
+        }
+      });
+    } else {
+      // Новая монета с активными сигналами (только если они НЕ протухшие)
+      tfList.forEach(tf => {
+        const hasActiveSignal = newSignal[`percentileSignal_${tf}`];
+        const hasExpiredSignal = newSignal[`percentileSignalExpired_${tf}`];
+        
+        if (hasActiveSignal && !hasExpiredSignal) {
+          // Звук только для 5m, 15m, 30m, 1h (исключаем 1m)
+          if (tf !== '1m') {
+            hasNewActiveSignals = true;
+          }
+          console.log(`🐸 Новая монета с АКТИВНЫМ сигналом: ${newSignal.symbol} на ${tf} (${newSignal[`percentileRank_${tf}`]?.toFixed(1)}%) ${tf === '1m' ? '(без звука)' : ''}`);
+        } else if (hasExpiredSignal) {
+          console.log(`⚠️ Новая монета с протухшим сигналом: ${newSignal.symbol} на ${tf} (${newSignal[`percentileRank_${tf}`]?.toFixed(1)}%)`);
+        }
+      });
+    }
+    
+    // Воспроизводим звук при новых активных сигналах
+    if (hasNewActiveSignals && playSound) {
+      playSignalSound();
+    }
+    
+    return hasNewActiveSignals;
+  };
+
+  // Функция для обработки обновлений сигналов
+  const processSignalUpdates = (prevSignals, newSignals, playSound = false) => {
+    const prevMap = new Map(prevSignals.map(s => [s.symbol, s]));
+    let hasAnyNewSignals = false;
+    
+    // сортируем по symbol для стабильности
+    const sortedData = [...newSignals].sort((a, b) => a.symbol.localeCompare(b.symbol));
+    const merged = [];
+    
+    for (const newSig of sortedData) {
+      const old = prevMap.get(newSig.symbol);
+      
+      // Проверяем новые активные сигналы
+      const hasNewSignals = checkForNewSignals(old, newSig, playSound && prevSignals.length > 0);
+      if (hasNewSignals) hasAnyNewSignals = true;
+      
+      if (old) {
+        // сравниваем только ключевые поля (глубокое сравнение для вложенных)
+        let changed = false;
+        for (const key of Object.keys(newSig)) {
+          if (typeof newSig[key] === 'object' && newSig[key] !== null) {
+            if (JSON.stringify(newSig[key]) !== JSON.stringify(old[key])) {
+              changed = true;
+              break;
+            }
+          } else {
+            if (newSig[key] !== old[key]) {
+              changed = true;
+              break;
+            }
+          }
+        }
+        merged.push(changed ? { ...old, ...newSig } : old);
+      } else {
+        merged.push(newSig);
+      }
+    }
+    
+    return merged;
   };
 
   // Обновление сигналов с разной логикой сброса:
@@ -97,233 +190,120 @@ function App() {
     if (paramsChanged) {
       setSignals([]);
     }
+    
     try {
       // Автоматически определяем адрес WebSocket
       const wsUrl = `ws://${window.location.hostname}:3001`;
       ws = new window.WebSocket(wsUrl);
+      
       ws.onopen = () => {
-        ws.send(JSON.stringify({ percentileWindow: appliedPercentileWindow, percentileLevel: appliedPercentileLevel }));
+        console.log('🔌 WebSocket connected');
+        // Новый сервер автоматически отправляет данные при подключении
+        // Если нужно обновить настройки, отправляем их
+        if (paramsChanged) {
+          ws.send(JSON.stringify({
+            type: 'update_settings',
+            data: {
+              percentileWindow: appliedPercentileWindow,
+              percentileLevel: appliedPercentileLevel
+            }
+          }));
+        }
       };
+      
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          if (Array.isArray(data)) {
-            // Фильтруем валидные сигналы
-            const validSignals = data.filter(isValidSignal);
-            if (validSignals.length === 0 && data.length > 0) {
-              return; // Игнорируем сообщения с невалидными данными
+          const message = JSON.parse(event.data);
+          
+          if (message.type === 'full_update' || message.type === 'settings_update') {
+            // Полное обновление данных
+            const validSignals = message.data.signals.filter(isValidSignal);
+            
+            // Сохраняем данные свечей
+            if (message.data.candles) {
+              setCandleData(message.data.candles);
             }
             
             setSignals(prevSignals => {
-              if (paramsChanged) {
+              if (paramsChanged || message.type === 'settings_update') {
                 // При смене параметров - просто заменяем все сигналы (без звука)
                 return [...validSignals].sort((a, b) => a.symbol.localeCompare(b.symbol));
               } else {
                 // merge: обновляем только изменившиеся, не трогаем остальные
-                const prevMap = new Map(prevSignals.map(s => [s.symbol, s]));
-                
-                // Проверяем новые активные сигналы для звукового оповещения
-                let hasNewActiveSignals = false;
-                
-                // сортируем по symbol для стабильности
-                const sortedData = [...validSignals].sort((a, b) => a.symbol.localeCompare(b.symbol));
-                // Удаляем отсутствующие, обновляем только изменившиеся, добавляем новые
-                const merged = [];
-                for (const newSig of sortedData) {
-                  const old = prevMap.get(newSig.symbol);
-                  
-                  // Проверяем новые активные сигналы (не протухшие)
-                  if (old) {
-                    tfList.forEach(tf => {
-                      const oldHasActiveSignal = old[`percentileSignal_${tf}`];
-                      const newHasActiveSignal = newSig[`percentileSignal_${tf}`];
-                      const newHasExpiredSignal = newSig[`percentileSignalExpired_${tf}`];
-                      
-                      // Новый активный сигнал появился (и он НЕ протухший)
-                      if (!oldHasActiveSignal && newHasActiveSignal && !newHasExpiredSignal) {
-                        // Звук только для 5m, 15m, 30m (исключаем 1m и 3m)
-                        if (tf !== '1m' && tf !== '3m') {
-                          hasNewActiveSignals = true;
-                        }
-                        console.log(`🐸 Новый АКТИВНЫЙ сигнал: ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%) ${tf === '1m' || tf === '3m' ? '(без звука)' : ''}`);
-                      }
-                      
-                      // Логируем протухшие сигналы отдельно (без звука)
-                      const oldHasExpiredSignal = old[`percentileSignalExpired_${tf}`];
-                      if (!oldHasExpiredSignal && newHasExpiredSignal) {
-                        console.log(`⚠️ Протухший сигнал: ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%)`);
-                      }
-                    });
-                  } else {
-                    // Новая монета с активными сигналами (только если они НЕ протухшие)
-                    tfList.forEach(tf => {
-                      const hasActiveSignal = newSig[`percentileSignal_${tf}`];
-                      const hasExpiredSignal = newSig[`percentileSignalExpired_${tf}`];
-                      
-                      if (hasActiveSignal && !hasExpiredSignal) {
-                        // Звук только для 5m, 15m, 30m (исключаем 1m и 3m)
-                        if (tf !== '1m' && tf !== '3m') {
-                          hasNewActiveSignals = true;
-                        }
-                        console.log(`🐸 Новая монета с АКТИВНЫМ сигналом: ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%) ${tf === '1m' || tf === '3m' ? '(без звука)' : ''}`);
-                      } else if (hasExpiredSignal) {
-                        console.log(`⚠️ Новая монета с протухшим сигналом: ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%)`);
-                      }
-                    });
-                  }
-                  
-                  if (old) {
-                    // сравниваем только ключевые поля (глубокое сравнение для вложенных)
-                    let changed = false;
-                    for (const key of Object.keys(newSig)) {
-                      if (typeof newSig[key] === 'object' && newSig[key] !== null) {
-                        if (JSON.stringify(newSig[key]) !== JSON.stringify(old[key])) { changed = true; break; }
-                      } else {
-                        if (newSig[key] !== old[key]) { changed = true; break; }
-                      }
-                    }
-                    merged.push(changed ? { ...old, ...newSig } : old);
-                  } else {
-                    merged.push(newSig);
-                  }
-                }
-                
-                // Воспроизводим звук при новых активных сигналах
-                if (hasNewActiveSignals && prevSignals.length > 0) { // не играем звук при первой загрузке
-                  playSignalSound();
-                }
-                
-                return merged;
+                return processSignalUpdates(prevSignals, validSignals, true);
               }
             });
+            
+            setLoading(false);
+          } else if (message.type === 'periodic_update') {
+            // Периодическое обновление
+            const validSignals = message.data.signals.filter(isValidSignal);
+            
+            // Обновляем данные свечей
+            if (message.data.candles) {
+              setCandleData(message.data.candles);
+            }
+            
+            setSignals(prevSignals => processSignalUpdates(prevSignals, validSignals, false));
+          } else if (message.type === 'symbol_update') {
+            // Обновление конкретного символа
+            const symbolData = message.data.signal;
+            
+            // Обновляем данные свечей для конкретного символа
+            if (message.data.candles) {
+              setCandleData(prev => ({
+                ...prev,
+                [message.symbol]: message.data.candles
+              }));
+            }
+            
+            if (isValidSignal(symbolData)) {
+              setSignals(prevSignals => {
+                const updated = [...prevSignals];
+                const index = updated.findIndex(s => s.symbol === symbolData.symbol);
+                if (index >= 0) {
+                  // Проверяем новые сигналы для звука
+                  checkForNewSignals(updated[index], symbolData, true);
+                  updated[index] = symbolData;
+                } else {
+                  updated.push(symbolData);
+                }
+                return updated.sort((a, b) => a.symbol.localeCompare(b.symbol));
+              });
+            }
           }
-        } catch (e) { /* ignore parse errors */ }
+        } catch (e) {
+          console.error('Error parsing WebSocket message:', e);
+        }
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
         setLoading(false);
       };
-      ws.onerror = (e) => {
+      
+      ws.onclose = () => {
+        console.log('🔌 WebSocket disconnected');
         setLoading(false);
       };
+      
     } catch (e) {
+      console.error('Error creating WebSocket:', e);
       setLoading(false);
     }
+    
     prevParams.current = { percentileWindow: appliedPercentileWindow, percentileLevel: appliedPercentileLevel };
-    return () => { if (ws) ws.close(); };
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
   }, [reloadKey, appliedPercentileWindow, appliedPercentileLevel]);
 
 // Убираем монтирование/размонтирование App логи
 useEffect(() => {
   // пустой эффект
 }, []);
-
-  // Периодическое обновление каждую минуту для текущей конфигурации
-  useEffect(() => {
-    let intervalId;
-    let ws;
-    let closed = false;
-    function fetchUpdate() {
-      // Автоматически определяем адрес WebSocket
-      const wsUrl = `ws://${window.location.hostname}:3001`;
-      ws = new window.WebSocket(wsUrl);
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ percentileWindow: appliedPercentileWindow, percentileLevel: appliedPercentileLevel }));
-      };
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (Array.isArray(data)) {
-            // Фильтруем валидные сигналы
-            const validSignals = data.filter(isValidSignal);
-            if (validSignals.length === 0 && data.length > 0) {
-              return; // Игнорируем сообщения с невалидными данными
-            }
-            
-            setSignals(prevSignals => {
-              // merge: обновляем только изменившиеся, не трогаем остальные
-              const prevMap = new Map(prevSignals.map(s => [s.symbol, s]));
-              
-              // Проверяем новые активные сигналы для звукового оповещения
-              let hasNewActiveSignals = false;
-              
-              // сортируем по symbol для стабильности
-              const sortedData = [...validSignals].sort((a, b) => a.symbol.localeCompare(b.symbol));
-              // Удаляем отсутствующие, обновляем только изменившиеся, добавляем новые
-              const merged = [];
-              for (const newSig of sortedData) {
-                const old = prevMap.get(newSig.symbol);
-                
-                // Проверяем новые активные сигналы (не протухшие)
-                if (old) {
-                  tfList.forEach(tf => {
-                    const oldHasActiveSignal = old[`percentileSignal_${tf}`];
-                    const newHasActiveSignal = newSig[`percentileSignal_${tf}`];
-                    const newHasExpiredSignal = newSig[`percentileSignalExpired_${tf}`];
-                    
-                    // Новый активный сигнал появился (и он НЕ протухший)
-                    if (!oldHasActiveSignal && newHasActiveSignal && !newHasExpiredSignal) {
-                      // В периодическом обновлении НЕ играем звук (только логируем)
-                      console.log(`🐸 Новый АКТИВНЫЙ сигнал (периодич, БЕЗ звука): ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%)`);
-                    }
-                    
-                    // Логируем протухшие сигналы отдельно (без звука)
-                    const oldHasExpiredSignal = old[`percentileSignalExpired_${tf}`];
-                    if (!oldHasExpiredSignal && newHasExpiredSignal) {
-                      console.log(`⚠️ Протухший сигнал (периодич): ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%)`);
-                    }
-                  });
-                } else {
-                  // Новая монета с активными сигналами (только если они НЕ протухшие)
-                  tfList.forEach(tf => {
-                    const hasActiveSignal = newSig[`percentileSignal_${tf}`];
-                    const hasExpiredSignal = newSig[`percentileSignalExpired_${tf}`];
-                    
-                    if (hasActiveSignal && !hasExpiredSignal) {
-                      // В периодическом обновлении НЕ играем звук (только логируем)
-                      console.log(`🐸 Новая монета с АКТИВНЫМ сигналом (периодич, БЕЗ звука): ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%)`);
-                    } else if (hasExpiredSignal) {
-                      console.log(`⚠️ Новая монета с протухшим сигналом (периодич): ${newSig.symbol} на ${tf} (${newSig[`percentileRank_${tf}`]?.toFixed(1)}%)`);
-                    }
-                  });
-                }
-                
-                if (old) {
-                  let changed = false;
-                  for (const key of Object.keys(newSig)) {
-                    if (typeof newSig[key] === 'object' && newSig[key] !== null) {
-                      if (JSON.stringify(newSig[key]) !== JSON.stringify(old[key])) { changed = true; break; }
-                    } else {
-                      if (newSig[key] !== old[key]) { changed = true; break; }
-                    }
-                  }
-                  merged.push(changed ? { ...old, ...newSig } : old);
-                } else {
-                  merged.push(newSig);
-                }
-              }
-              
-              // НЕ воспроизводим звук в периодическом обновлении (только в основном)
-              // Звук играет только основной useEffect, чтобы избежать дублирования
-              
-              return merged;
-            });
-          }
-        } catch (e) { /* ignore parse errors */ }
-      };
-      ws.onerror = (e) => { /* ignore errors */ };
-      ws.onclose = () => { /* ignore close */ };
-    }
-    intervalId = setInterval(() => {
-      if (!closed) fetchUpdate();
-    }, 15000); // 15 секунд для более быстрого отклика
-    // Первый вызов сразу
-    fetchUpdate();
-    return () => {
-      closed = true;
-      clearInterval(intervalId);
-      if (ws) ws.close();
-    };
-  }, [appliedPercentileWindow, appliedPercentileLevel]);
-
-  // Комментарий: периодическое обновление теперь происходит каждую минуту
 
   // Загрузка свечей для первого символа
   useEffect(() => {
@@ -943,10 +923,11 @@ useEffect(() => {
                         nATR: {coin.natr30m?.toFixed(2) || 'N/A'}
                       </span>
                     </div>
-                    <MultiChart 
-                      symbol={coin.symbol} 
+                    <MultiChart
+                      symbol={coin.symbol}
                       percentileWindow={appliedPercentileWindow}
                       percentileLevel={appliedPercentileLevel}
+                      candleData={candleData}
                     />
                   </div>
                 ))}
