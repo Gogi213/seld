@@ -87,7 +87,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
           textColor: '#DDD',
         },
         grid: {
-          vertLines: { color: '#222' },
+          vertLines: { color: '#222', visible: false },
           horzLines: { color: '#222' },
         },
         timeScale: {

@@ -97,9 +97,9 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData }) =
               padding: '2px 6px',
               fontSize: '11px',
               fontWeight: 500,
-              background: selectedTimeframe === tf ? '#1976d2' : 'transparent',
+              background: 'transparent',
               color: selectedTimeframe === tf ? '#fff' : '#aaa',
-              border: selectedTimeframe === tf ? '1px solid #1976d2' : '1px solid #555',
+              border: selectedTimeframe === tf ? '2px solid #fff' : '1px solid #555',
               borderRadius: '3px',
               cursor: 'pointer',
               transition: 'all 0.2s ease'
