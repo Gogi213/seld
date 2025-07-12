@@ -28,8 +28,8 @@ function App() {
   const [pinSignalsTop, setPinSignalsTop] = useState(true);
 
   // Хуки
-  const { signals, loading, candleData } = useWebSocket(appliedPercentileWindow, appliedPercentileLevel, reloadKey);
-  const { soundEnabled, setSoundEnabled } = useSignalSound();
+  const { soundEnabled, setSoundEnabled, checkForNewSignals } = useSignalSound();
+  const { signals, loading, candleData } = useWebSocket(appliedPercentileWindow, appliedPercentileLevel, reloadKey, checkForNewSignals);
   const pagination = usePagination(signals, pinSignalsTop, DEFAULT_SETTINGS.CHARTS_PER_PAGE);
 
   // Сброс страницы при открытии графиков

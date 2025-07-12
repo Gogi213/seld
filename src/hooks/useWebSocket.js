@@ -1,7 +1,7 @@
 // useWebSocket.js - хук для управления WebSocket соединением
 import { useEffect, useState, useRef, useCallback } from 'react';
 
-export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, reloadKey) => {
+export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, reloadKey, checkForNewSignals) => {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [candleData, setCandleData] = useState({});
@@ -34,14 +34,26 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
             }
           }
         }
-        merged.push(changed ? { ...old, ...newSig } : old);
+        
+        const updatedSignal = changed ? { ...old, ...newSig } : old;
+        merged.push(updatedSignal);
+        
+        // Проверяем новые сигналы для звука
+        if (changed && checkForNewSignals && playSound) {
+          checkForNewSignals(old, updatedSignal, true);
+        }
       } else {
         merged.push(newSig);
+        
+        // Проверяем новые символы для звука
+        if (checkForNewSignals && playSound) {
+          checkForNewSignals(null, newSig, true);
+        }
       }
     }
     
     return merged;
-  }, []);
+  }, [checkForNewSignals]);
 
   useEffect(() => {
     let ws;
@@ -94,7 +106,7 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
               if (paramsChanged || message.type === 'settings_update') {
                 return [...validSignals].sort((a, b) => a.symbol.localeCompare(b.symbol));
               } else {
-                return processSignalUpdates(prevSignals, validSignals, true);
+                return processSignalUpdates(prevSignals, validSignals, false);
               }
             });
             
@@ -113,7 +125,7 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
               setCandleData(message.data.candles);
             }
             
-            setSignals(prevSignals => processSignalUpdates(prevSignals, validSignals, false));
+            setSignals(prevSignals => processSignalUpdates(prevSignals, validSignals, true));
           } else if (message.type === 'symbol_update') {
             const symbolData = message.data.signal;
             
@@ -133,11 +145,19 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
               setSignals(prevSignals => {
                 const updated = [...prevSignals];
                 const index = updated.findIndex(s => s.symbol === symbolData.symbol);
+                const oldSignal = index >= 0 ? updated[index] : null;
+                
                 if (index >= 0) {
                   updated[index] = symbolData;
                 } else {
                   updated.push(symbolData);
                 }
+                
+                // Проверяем новые сигналы для звука
+                if (checkForNewSignals) {
+                  checkForNewSignals(oldSignal, symbolData, true);
+                }
+                
                 return updated.sort((a, b) => a.symbol.localeCompare(b.symbol));
               });
             }
