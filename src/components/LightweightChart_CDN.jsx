@@ -114,7 +114,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
         watermark: {
           visible: !!symbol,
           fontSize: 38,
-          color: 'rgba(255,255,255,0.10)',
+          color: 'rgba(255,255,255,0.50)',
           text: symbol,
           horzAlign: 'center',
           vertAlign: 'top',
