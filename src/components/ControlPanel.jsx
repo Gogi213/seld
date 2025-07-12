@@ -16,8 +16,6 @@ const ControlPanel = ({
   setAppliedPercentileWindow,
   setAppliedPercentileLevel,
   setReloadKey,
-  soundEnabled,
-  setSoundEnabled,
   CurrentTimeComponent
 }) => {
   const handleApplySettings = () => {
@@ -26,9 +24,7 @@ const ControlPanel = ({
     setReloadKey(k => k + 1);
   };
 
-  const toggleSound = () => {
-    setSoundEnabled(!soundEnabled);
-  };
+
 
   return (
     <div style={{ marginBottom: 16, marginTop: 8 }}>
@@ -158,20 +154,19 @@ const ControlPanel = ({
               </button>
               
               <button
-                onClick={toggleSound}
                 style={{
                   padding: '5px 12px',
                   fontWeight: 500,
-                  background: soundEnabled ? '#4caf50' : '#f44336',
+                  background: '#4caf50',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '13px',
-                  boxShadow: `0 2px 4px ${soundEnabled ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)'}`
+                  boxShadow: '0 2px 4px rgba(76, 175, 80, 0.3)'
                 }}
               >
-                {soundEnabled ? 'Выключить звук' : 'Включить звук'}
+                Выключить звук
               </button>
             </div>
           </div>
