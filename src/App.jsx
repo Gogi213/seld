@@ -68,6 +68,7 @@ function App() {
   const [signalMarkers, setSignalMarkers] = useState([]);
   const [soundEnabled, setSoundEnabled] = useState(true); // включить/выключить звук
   const [candleData, setCandleData] = useState({}); // данные свечей для всех символов
+  const [pinSignalsTop, setPinSignalsTop] = useState(true); // чекбокс закрепления сигналов сверху
   
   // Функция для воспроизведения звука
   const playSignalSound = () => {
@@ -405,22 +406,19 @@ useEffect(() => {
   const allChartCoins = signals
     .filter(s => s && s.symbol && typeof s.natr30m === 'number')
     .sort((a, b) => {
-      // Сначала проверяем наличие жабок (активных или протухших сигналов)
-      const hasSignalsA = tfList.some(tf => 
-        a[`percentileSignal_${tf}`] || a[`percentileSignalExpired_${tf}`]
-      );
-      const hasSignalsB = tfList.some(tf => 
-        b[`percentileSignal_${tf}`] || b[`percentileSignalExpired_${tf}`]
-      );
-      
-      // Монеты с жабками идут наверх
-      if (hasSignalsA && !hasSignalsB) return -1;
-      if (!hasSignalsA && hasSignalsB) return 1;
-      
-      // Если обе монеты в одной группе (с жабками или без), сортируем по NATR по убыванию
-      return (b.natr30m || 0) - (a.natr30m || 0);
+      if (pinSignalsTop) {
+        // Сначала закрепляем монеты с сигналами (🐸), сортируем их по natr30m убыв.
+        const hasSignalsA = tfList.some(tf => a[`percentileSignal_${tf}`] || a[`percentileSignalExpired_${tf}`]);
+        const hasSignalsB = tfList.some(tf => b[`percentileSignal_${tf}`] || b[`percentileSignalExpired_${tf}`]);
+        if (hasSignalsA && !hasSignalsB) return -1;
+        if (!hasSignalsA && hasSignalsB) return 1;
+        // Внутри групп сортируем по natr30m убыванию
+        return (b.natr30m || 0) - (a.natr30m || 0);
+      } else {
+        // Просто по natr30m убыванию
+        return (b.natr30m || 0) - (a.natr30m || 0);
+      }
     });
-  
   const totalPages = Math.ceil(allChartCoins.length / chartsPerPage);
   const startIndex = (currentPage - 1) * chartsPerPage;
   const currentPageCoins = allChartCoins.slice(startIndex, startIndex + chartsPerPage);
@@ -481,7 +479,16 @@ useEffect(() => {
               cursor: 'pointer',
               boxShadow: activeTab === 'alt' ? '0 0 4px #e91e63' : '0 0 2px #c2185b'
             }}>Графики</button>
-            
+            {/* Новый чекбокс закрепления сигналов сверху */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#222', borderRadius: 6, border: '1px solid #333', padding: '8px 12px', fontSize: 13, color: '#fff', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={pinSignalsTop}
+                onChange={e => setPinSignalsTop(e.target.checked)}
+                style={{ marginRight: 4 }}
+              />
+              Закрепить монеты
+            </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: '#222', borderRadius: '6px', border: '1px solid #333' }}>
                 <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
@@ -676,23 +683,18 @@ useEffect(() => {
                   <tbody>
                     {[...signals]
                       .sort((a, b) => {
-                        // Сначала проверяем наличие жабок (активных или протухших сигналов)
-                        const hasSignalsA = tfList.some(tf => 
-                          a[`percentileSignal_${tf}`] || a[`percentileSignalExpired_${tf}`]
-                        );
-                        const hasSignalsB = tfList.some(tf => 
-                          b[`percentileSignal_${tf}`] || b[`percentileSignalExpired_${tf}`]
-                        );
-                        
-                        // Монеты с жабками идут наверх
-                        if (hasSignalsA && !hasSignalsB) return -1;
-                        if (!hasSignalsA && hasSignalsB) return 1;
-                        
-                        // Если обе монеты в одной группе (с жабками или без), сортируем по выбранному критерию
+                        if (pinSignalsTop) {
+                          // Сначала закрепляем монеты с сигналами (🐸), сортируем их по natr30m убыв.
+                          const hasSignalsA = tfList.some(tf => a[`percentileSignal_${tf}`] || a[`percentileSignalExpired_${tf}`]);
+                          const hasSignalsB = tfList.some(tf => b[`percentileSignal_${tf}`] || b[`percentileSignalExpired_${tf}`]);
+                          if (hasSignalsA && !hasSignalsB) return -1;
+                          if (!hasSignalsA && hasSignalsB) return 1;
+                          // Внутри групп сортируем по natr30m убыванию
+                          return (b.natr30m || 0) - (a.natr30m || 0);
+                        }
+                        // Если не закреплять — сортируем по выбранному критерию (по умолчанию natr30m по убыванию)
                         let vA = a[sortKey];
                         let vB = b[sortKey];
-                        
-                        // Для symbol сортируем как строки, для остальных — числа
                         if (sortKey === 'symbol') {
                           vA = vA || '';
                           vB = vB || '';
@@ -700,7 +702,6 @@ useEffect(() => {
                           if (vA > vB) return sortDir === 'asc' ? 1 : -1;
                           return 0;
                         } else if (sortKey.startsWith('percentileRank_')) {
-                          // Сортируем только монеты с этим сигналом, остальные в конец
                           const hasA = a[sortKey] !== undefined && a[sortKey] !== null;
                           const hasB = b[sortKey] !== undefined && b[sortKey] !== null;
                           if (!hasA && !hasB) return 0;
@@ -808,6 +809,7 @@ useEffect(() => {
             padding: '0 15px',
             flexShrink: 0
           }}>
+
             {/* Левая часть - навигация по страницам */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
               <button 
@@ -830,7 +832,7 @@ useEffect(() => {
                 ◀
               </button>
               <span style={{ color: '#aaa', fontSize: '12px' }}>
-                Страница {currentPage} из {totalPages}
+                {currentPage} из {totalPages}
               </span>
               <button 
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
@@ -853,23 +855,35 @@ useEffect(() => {
               </button>
             </div>
 
-            {/* Правая часть - кнопка выхода */}
-            <button 
-              onClick={() => setActiveTab('signals')}
-              style={{
-                background: '#1976d2',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '3px',
-                padding: '6px 12px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                fontWeight: 500,
-                boxShadow: '0 0 3px #1976d2'
-              }}
-            >
-              Сигналы
-            </button>
+
+            {/* Правая часть - чекбокс и кнопка выхода */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#222', borderRadius: 6, border: '1px solid #333', padding: '6px 10px', fontSize: 13, color: '#fff', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={pinSignalsTop}
+                  onChange={e => setPinSignalsTop(e.target.checked)}
+                  style={{ marginRight: 4 }}
+                />
+                Закрепить монеты
+              </label>
+              <button 
+                onClick={() => setActiveTab('signals')}
+                style={{
+                  background: '#1976d2',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '3px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  boxShadow: '0 0 3px #1976d2'
+                }}
+              >
+                Сигналы
+              </button>
+            </div>
           </div>
           
           {/* Сетка графиков */}
