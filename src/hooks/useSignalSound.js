@@ -17,7 +17,7 @@ export const useSignalSound = () => {
     if (!soundEnabled) return;
     try {
       const audio = new Audio('/sounds/lighter.mp3');
-      audio.volume = 0.85;
+      audio.volume = 1.0;
       audio.play().catch(e => {
         console.log('Не удалось воспроизвести звук:', e);
       });
