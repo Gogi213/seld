@@ -7,8 +7,8 @@ const CandleAggregator = require('./candleAggregator.cjs');
 const BinanceWebSocketManager = require('./binanceWebSocket.cjs');
 const EnhancedSignalEngine = require('./enhancedSignalEngine.cjs');
 
-const MIN_DAILY_VOLUME = 100000000; // 20 млн суточного объёма
-const MIN_NOTIONAL = 0.3; // 0.4 NATR
+const MIN_DAILY_VOLUME = 150000000; // 20 млн суточного объёма
+const MIN_NOTIONAL = 0.4; // 0.4 NATR
 
 // Глобальные настройки
 const DEFAULT_PERCENTILE_WINDOW = 50;
