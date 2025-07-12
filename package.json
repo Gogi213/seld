@@ -9,7 +9,8 @@
     "start": "concurrently \"npm:dev\" \"npm:wait-electron\" \"npm:backend\"",
     "wait-electron": "wait-on http://localhost:5173 && electron .",
     "electron": "electron .",
-    "backend": "node backend.cjs",
+    "backend": "node backend-refactored.cjs",
+    "backend-old": "node backend.cjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
