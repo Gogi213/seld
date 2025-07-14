@@ -1,5 +1,5 @@
 // usePagination.js - хук для управления пагинацией графиков
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 const tfList = ["1m", "5m", "15m", "30m", "1h"];
 
@@ -27,11 +27,17 @@ export const usePagination = (signals, pinSignalsTop, chartsPerPage = 9) => {
   const startIndex = (currentPage - 1) * chartsPerPage;
   const currentPageCoins = allChartCoins.slice(startIndex, startIndex + chartsPerPage);
 
-  // Сброс страницы при смене данных
+  // Сброс страницы только если уменьшилось количество страниц и текущая страница вне диапазона
+  const prevTotalPagesRef = useRef(totalPages);
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
+    if (
+      totalPages < prevTotalPagesRef.current &&
+      currentPage > totalPages &&
+      totalPages > 0
+    ) {
+      setCurrentPage(totalPages);
     }
+    prevTotalPagesRef.current = totalPages;
   }, [totalPages, currentPage]);
 
   const goToNextPage = () => {

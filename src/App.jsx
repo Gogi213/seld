@@ -32,12 +32,17 @@ function App() {
   const { signals, loading, candleData } = useWebSocket(appliedPercentileWindow, appliedPercentileLevel, reloadKey, checkForNewSignals);
   const pagination = usePagination(signals, pinSignalsTop, DEFAULT_SETTINGS.CHARTS_PER_PAGE);
 
-  // Сброс страницы при открытии графиков
+  // Сброс страницы только при смене вкладки на графики
+  const prevTab = React.useRef(activeTab);
   useEffect(() => {
-    if (activeTab === TABS.CHARTS) {
+    if (
+      (activeTab === TABS.CHARTS || activeTab === 'alt') &&
+      prevTab.current !== activeTab
+    ) {
       pagination.resetToFirstPage();
     }
-  }, [activeTab, pagination]);
+    prevTab.current = activeTab;
+  }, [activeTab]);
 
   return (
     <div style={{ 
@@ -75,7 +80,7 @@ function App() {
         />
       )}
 
-      {activeTab === TABS.CHARTS && (
+      {(activeTab === TABS.CHARTS || activeTab === 'alt') && (
         <ChartView
           currentPageCoins={pagination.currentPageCoins}
           appliedPercentileWindow={appliedPercentileWindow}
