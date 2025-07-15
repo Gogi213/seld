@@ -97,7 +97,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
         },
         rightPriceScale: { borderColor: '#444' },
         crosshair: {
-          mode: 1,
+          mode: 0,
           vertLine: {
             width: 1,
             color: '#758696',
