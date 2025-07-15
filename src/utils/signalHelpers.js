@@ -53,42 +53,52 @@ export function calculateSignalMarkers(candles, percentileWindow, percentileLeve
 
 // Функция для сортировки сигналов
 export function sortSignals(signals, sortKey, sortDir, pinSignalsTop) {
-  return [...signals].sort((a, b) => {
-    if (pinSignalsTop) {
-      // Сначала закрепляем монеты с сигналами (🐸), сортируем их по natr30m убыв.
-      const hasSignalsA = TF_LIST.some(tf => a[`percentileSignal_${tf}`] || a[`percentileSignalExpired_${tf}`]);
-      const hasSignalsB = TF_LIST.some(tf => b[`percentileSignal_${tf}`] || b[`percentileSignalExpired_${tf}`]);
-      if (hasSignalsA && !hasSignalsB) return -1;
-      if (!hasSignalsA && hasSignalsB) return 1;
-      // Внутри групп сортируем по natr30m убыванию
-      return (b.natr30m || 0) - (a.natr30m || 0);
-    }
-    
-    // Если не закреплять — сортируем по выбранному критерию
-    let vA = a[sortKey];
-    let vB = b[sortKey];
-    
-    if (sortKey === 'symbol') {
-      vA = vA || '';
-      vB = vB || '';
-      if (vA < vB) return sortDir === 'asc' ? -1 : 1;
-      if (vA > vB) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    } else if (sortKey.startsWith('percentileRank_')) {
-      const hasA = a[sortKey] !== undefined && a[sortKey] !== null;
-      const hasB = b[sortKey] !== undefined && b[sortKey] !== null;
-      if (!hasA && !hasB) return 0;
-      if (!hasA) return 1;
-      if (!hasB) return -1;
-      vA = Number(vA) || 0;
-      vB = Number(vB) || 0;
-      return sortDir === 'asc' ? vA - vB : vB - vA;
-    } else {
-      vA = Number(vA) || 0;
-      vB = Number(vB) || 0;
-      return sortDir === 'asc' ? vA - vB : vB - vA;
-    }
-  });
+  if (!pinSignalsTop) {
+    // Обычная сортировка по выбранному столбцу
+    return [...signals].sort((a, b) => compareSignals(a, b, sortKey, sortDir));
+  }
+
+  // Разделяем на pinned и обычные
+  const pinned = [];
+  const rest = [];
+  for (const s of signals) {
+    const hasSignal = TF_LIST.some(tf => s[`percentileSignal_${tf}`] || s[`percentileSignalExpired_${tf}`]);
+    (hasSignal ? pinned : rest).push(s);
+  }
+
+  // Сортируем обе группы по выбранному столбцу
+  pinned.sort((a, b) => compareSignals(a, b, sortKey, sortDir));
+  rest.sort((a, b) => compareSignals(a, b, sortKey, sortDir));
+
+  // pinned сверху
+  return [...pinned, ...rest];
+}
+
+// Универсальная функция сравнения по sortKey/sortDir
+function compareSignals(a, b, sortKey, sortDir) {
+  let vA = a[sortKey];
+  let vB = b[sortKey];
+
+  if (sortKey === 'symbol') {
+    vA = vA || '';
+    vB = vB || '';
+    if (vA < vB) return sortDir === 'asc' ? -1 : 1;
+    if (vA > vB) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  } else if (sortKey.startsWith('percentileRank_')) {
+    const hasA = vA !== undefined && vA !== null;
+    const hasB = vB !== undefined && vB !== null;
+    if (!hasA && !hasB) return 0;
+    if (!hasA) return 1;
+    if (!hasB) return -1;
+    vA = Number(vA) || 0;
+    vB = Number(vB) || 0;
+    return sortDir === 'asc' ? vA - vB : vB - vA;
+  } else {
+    vA = Number(vA) || 0;
+    vB = Number(vB) || 0;
+    return sortDir === 'asc' ? vA - vB : vB - vA;
+  }
 }
 
 // Функция для проверки наличия сигналов у монеты
