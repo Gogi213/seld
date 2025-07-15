@@ -100,10 +100,11 @@ class SymbolManager {
             });
             
             // Предзагружаем ВСЕ исторические данные в агрегатор
-            console.log(`📈 Loading ${historicalKlines.length} historical candles for ${symbol}`);
+            // ...
             for (const candle of historicalKlines) {
               this.candleAggregator.addMinuteCandle(symbol, candle);
             }
+            // ...
           }
         } catch (error) {
           console.error(`Error processing ${symbol}:`, error.message);

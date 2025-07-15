@@ -88,7 +88,7 @@ class BinanceApiService {
         
     } catch (error) {
       console.error(`Error fetching historical klines for ${symbol}:`, error.message);
-      throw error;
+      return [];
     }
   }
 
@@ -116,10 +116,8 @@ class BinanceApiService {
    */
   calculateNATR(klines, period = 30) {
     if (klines.length < period + 1) return 0;
-    
     const last = klines.slice(-period - 1);
     let atr = 0;
-    
     for (let i = 1; i < last.length; i++) {
       const prev = last[i-1];
       const curr = last[i];
@@ -130,7 +128,6 @@ class BinanceApiService {
       );
       atr += tr;
     }
-    
     atr = atr / period;
     const lastClose = last[last.length-1]?.close;
     return lastClose ? (atr / lastClose) * 100 : 0;

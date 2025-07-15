@@ -162,11 +162,10 @@ class DataManager {
         case '1h': maxCandles = 66; break;    // 4000/60 ≈ 66
         default: maxCandles = 800;
       }
-      
       // Для 1m используем максимально доступное количество свечей
       const actualLimit = tf === '1m' ? 4000 : maxCandles;
+      // ...
       const candles = this.candleAggregator.getAggregatedCandles(symbol, tf, actualLimit);
-      
       candleData[tf] = candles.map(c => ({
         time: Math.floor(c.openTime / 1000), // TradingView формат
         open: c.open,

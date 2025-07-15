@@ -84,9 +84,9 @@ class EnhancedSignalEngine {
     
     // Получаем агрегированные свечи
     const candles = this.candleAggregator.getAggregatedCandles(
-      symbol, 
-      timeframe, 
-      this.defaultSettings.percentileWindow + 50
+      symbol,
+      timeframe,
+      4000
     );
     
     if (candles.length < this.defaultSettings.percentileWindow + 1) {

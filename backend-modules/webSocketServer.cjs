@@ -226,6 +226,7 @@ class WebSocketServer {
    */
   _sendToClient(ws, message) {
     if (ws.readyState === WebSocket.OPEN) {
+      // ...
       ws.send(JSON.stringify(message));
     }
   }

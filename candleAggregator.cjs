@@ -16,9 +16,7 @@ class CandleAggregator {
     if (!this.minuteCandles.has(symbol)) {
       this.minuteCandles.set(symbol, []);
     }
-    
     const candles = this.minuteCandles.get(symbol);
-    
     // Проверяем, не дублируется ли свеча по времени
     const existingIndex = candles.findIndex(c => c.openTime === candle.openTime);
     if (existingIndex !== -1) {
@@ -29,13 +27,11 @@ class CandleAggregator {
       candles.push(candle);
       // Сортируем по времени
       candles.sort((a, b) => a.openTime - b.openTime);
-      
       // Ограничиваем размер кэша
       if (candles.length > this.maxMinuteCandles) {
         candles.splice(0, candles.length - this.maxMinuteCandles);
       }
     }
-    
     // Инвалидируем кэш агрегированных данных для этого символа
     this.invalidateAggregatedCache(symbol);
   }
@@ -72,6 +68,7 @@ class CandleAggregator {
       // Для 1m просто возвращаем исходные данные
       const result = minuteCandles.slice(-limit);
       this.aggregatedCache.set(cacheKey, result);
+      // ...
       return result;
     }
     
