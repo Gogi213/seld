@@ -1,10 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import LightweightChart from './LightweightChart_CDN';
 
-const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, selectedTimeframe }) => {
+const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, selectedTimeframe: globalTimeframe }) => {
+  const timeframes = ['1m', '5m', '15m', '30m', '1h'];
+  const [selectedTimeframe, setSelectedTimeframe] = useState(globalTimeframe || '5m');
+  const [wasLocalChange, setWasLocalChange] = useState(false);
   const [candles, setCandles] = useState([]);
   const [signalMarkers, setSignalMarkers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Глобальный переключатель синхронизирует только в момент изменения
+  useEffect(() => {
+    if (globalTimeframe && globalTimeframe !== selectedTimeframe) {
+      setSelectedTimeframe(globalTimeframe);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalTimeframe]);
 
   // Получаем данные свечей из props (от родительского WebSocket)
   useEffect(() => {
@@ -72,6 +83,43 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
       position: 'relative',
       overflow: 'hidden'
     }}>
+      {/* Локальный переключатель таймфрейма */}
+      <div style={{
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        zIndex: 10,
+        display: 'flex',
+        gap: '4px',
+        background: 'rgba(34,34,34,0.95)',
+        padding: '4px',
+        borderRadius: '6px',
+        border: '1px solid #444',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+      }}>
+        {timeframes.map(tf => (
+          <button
+            key={tf}
+            onClick={() => {
+              setSelectedTimeframe(tf);
+              setWasLocalChange(true);
+            }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              background: 'transparent',
+              color: selectedTimeframe === tf ? '#fff' : '#aaa',
+              border: selectedTimeframe === tf ? '2px solid #fff' : '1px solid #555',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {tf}
+          </button>
+        ))}
+      </div>
       {loading ? (
         <div style={{
           display: 'flex',
