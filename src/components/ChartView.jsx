@@ -1,5 +1,5 @@
 // ChartView.jsx - компонент для отображения графиков
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import MultiChart from './MultiChart';
 
 const ChartView = ({ 
@@ -20,11 +20,14 @@ const ChartView = ({
   // Отключаем скроллинг на странице графиков
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    
     return () => {
       document.body.style.overflow = 'auto';
     };
   }, []);
+
+  // Глобальный таймфрейм для всех MultiChart
+  const [selectedTimeframe, setSelectedTimeframe] = useState('5m');
+  const timeframes = ['1m', '5m', '15m', '30m', '1h'];
 
   return (
     <div style={{ 
@@ -135,6 +138,7 @@ const ChartView = ({
             />
             Закрепить монеты
           </label>
+          {/* Панель таймфреймов справа */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -145,7 +149,7 @@ const ChartView = ({
             border: '1px solid #333',
             boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
           }}>
-            {['1m', '5m', '15m', '30m', '1h'].map(tf => (
+            {timeframes.map(tf => (
               <button
                 key={tf}
                 style={{
@@ -153,13 +157,13 @@ const ChartView = ({
                   fontSize: '11px',
                   fontWeight: 500,
                   background: 'transparent',
-                  color: '#aaa',
-                  border: '1px solid #555',
+                  color: selectedTimeframe === tf ? '#fff' : '#aaa',
+                  border: selectedTimeframe === tf ? '2px solid #fff' : '1px solid #555',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
-                onClick={() => {}}
+                onClick={() => setSelectedTimeframe(tf)}
               >
                 {tf}
               </button>
@@ -224,6 +228,7 @@ const ChartView = ({
                   percentileWindow={appliedPercentileWindow}
                   percentileLevel={appliedPercentileLevel}
                   candleData={candleData}
+                  selectedTimeframe={selectedTimeframe}
                 />
               </div>
             ))}

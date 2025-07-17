@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import LightweightChart from './LightweightChart_CDN';
 
-const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData }) => {
+const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, selectedTimeframe }) => {
   const [candles, setCandles] = useState([]);
   const [signalMarkers, setSignalMarkers] = useState([]);
-  const [selectedTimeframe, setSelectedTimeframe] = useState('5m');
   const [loading, setLoading] = useState(true);
-
-  const timeframes = ['1m', '5m', '15m', '30m', '1h'];
 
   // Получаем данные свечей из props (от родительского WebSocket)
   useEffect(() => {
@@ -75,41 +72,6 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData }) =
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Переключатель таймфреймов */}
-      <div style={{
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        zIndex: 10,
-        display: 'flex',
-        gap: '4px',
-        background: 'rgba(34,34,34,0.95)',
-        padding: '4px',
-        borderRadius: '6px',
-        border: '1px solid #444',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-      }}>
-        {timeframes.map(tf => (
-          <button
-            key={tf}
-            onClick={() => setSelectedTimeframe(tf)}
-            style={{
-              padding: '2px 6px',
-              fontSize: '11px',
-              fontWeight: 500,
-              background: 'transparent',
-              color: selectedTimeframe === tf ? '#fff' : '#aaa',
-              border: selectedTimeframe === tf ? '2px solid #fff' : '1px solid #555',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {tf}
-          </button>
-        ))}
-      </div>
-      
       {loading ? (
         <div style={{
           display: 'flex',
