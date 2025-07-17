@@ -86,15 +86,15 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
       {/* Локальный переключатель таймфрейма */}
       <div style={{
         position: 'absolute',
-        top: 4,
-        right: 4,
+        top: 4 / 1.2,
+        right: 4 / 1.2,
         zIndex: 10,
         display: 'flex',
-        gap: '4px',
+        gap: `${4 / 1.2}px`,
         background: 'rgba(34,34,34,0.95)',
-        padding: '4px',
-        borderRadius: '6px',
-        border: '1px solid #444',
+        padding: `${4 / 1.2}px`,
+        borderRadius: `${6 / 1.2}px`,
+        border: `${1 / 1.2}px solid #444`,
         boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
       }}>
         {timeframes.map(tf => (
@@ -105,13 +105,13 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
               setWasLocalChange(true);
             }}
             style={{
-              padding: '2px 6px',
-              fontSize: '11px',
+              padding: `${2 / 1.2}px ${6 / 1.2}px`,
+              fontSize: `${11 / 1.2}px`,
               fontWeight: 500,
               background: 'transparent',
               color: selectedTimeframe === tf ? '#fff' : '#aaa',
-              border: selectedTimeframe === tf ? '2px solid #fff' : '1px solid #555',
-              borderRadius: '3px',
+              border: selectedTimeframe === tf ? `${2 / 1.2}px solid #fff` : `${1 / 1.2}px solid #555`,
+              borderRadius: `${3 / 1.2}px`,
               cursor: 'pointer',
               transition: 'all 0.2s ease'
             }}
@@ -127,7 +127,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
           justifyContent: 'center',
           height: '100%',
           color: '#aaa',
-          fontSize: '14px'
+          fontSize: `${14 / 1.2}px`
         }}>
           Загрузка графика...
         </div>
@@ -138,7 +138,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
           justifyContent: 'center',
           height: '100%',
           color: '#888',
-          fontSize: '14px'
+          fontSize: `${14 / 1.2}px`
         }}>
           Нет данных
         </div>

@@ -139,7 +139,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
       
       // Объём на отдельной шкале снизу
       volumeSeriesRef.current = chartRef.current.addHistogramSeries({
-        color: '#cccccc',
+        color: '#888888',
         priceFormat: { type: 'volume' },
         priceScaleId: 'volume',
         scaleMargins: { top: 0.8, bottom: 0 },
@@ -156,7 +156,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
         const volumeData = data.map(bar => ({
           time: bar.time,
           value: bar.volume || 0,
-          color: bar.close > bar.open ? '#cccccc' : '#999999',
+          color: '#888888',
         }));
         volumeSeriesRef.current.setData(volumeData);
       }
@@ -194,7 +194,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
       const volumeData = data.map(bar => ({
         time: bar.time,
         value: bar.volume || 0,
-        color: bar.close > bar.open ? '#cccccc' : '#999999',
+        color: '#888888',
       }));
       volumeSeriesRef.current.setData(volumeData);
     }
