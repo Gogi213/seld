@@ -135,6 +135,36 @@ const ChartView = ({
             />
             Закрепить монеты
           </label>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: '#222',
+            padding: '4px',
+            borderRadius: '6px',
+            border: '1px solid #333',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+          }}>
+            {['1m', '5m', '15m', '30m', '1h'].map(tf => (
+              <button
+                key={tf}
+                style={{
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  background: 'transparent',
+                  color: '#aaa',
+                  border: '1px solid #555',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {}}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       
