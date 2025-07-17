@@ -71,11 +71,9 @@ const ChartView = ({
           >
             ◀
           </button>
-          
           <span style={{ color: '#aaa', fontSize: '12px' }}>
             {currentPage} из {totalPages}
           </span>
-          
           <button 
             onClick={goToNextPage}
             disabled={!canGoNext}
@@ -94,6 +92,22 @@ const ChartView = ({
             }}
           >
             ▶
+          </button>
+          <button 
+            onClick={() => setActiveTab('signals')}
+            style={{
+              background: '#1976d2',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '3px',
+              padding: '6px 12px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              fontWeight: 500,
+              boxShadow: '0 0 3px #1976d2'
+            }}
+          >
+            Сигналы
           </button>
         </div>
 
@@ -121,23 +135,6 @@ const ChartView = ({
             />
             Закрепить монеты
           </label>
-          
-          <button 
-            onClick={() => setActiveTab('signals')}
-            style={{
-              background: '#1976d2',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '3px',
-              padding: '6px 12px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              fontWeight: 500,
-              boxShadow: '0 0 3px #1976d2'
-            }}
-          >
-            Сигналы
-          </button>
         </div>
       </div>
       
