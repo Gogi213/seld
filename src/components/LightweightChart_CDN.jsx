@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 500, symbol = '' }) => {
+const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], width = 900, height = 500, symbol = '' }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef();
   const seriesRef = useRef();
@@ -191,10 +191,12 @@ const LightweightChartCDN = ({ data, signalMarkers = [], width = 900, height = 5
     if (data && data.length) {
       seriesRef.current.setData(data);
       // volume data
+      // Собираем времена для белых баров
+      const whiteTimes = (lowVolumeMarkers || []).map(m => m.time);
       const volumeData = data.map(bar => ({
         time: bar.time,
         value: bar.volume || 0,
-        color: '#888888',
+        color: whiteTimes.includes(bar.time) ? '#fff' : '#888888',
       }));
       volumeSeriesRef.current.setData(volumeData);
     }
