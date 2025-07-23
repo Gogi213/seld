@@ -1,5 +1,16 @@
 // SignalsTable.jsx - компонент таблицы сигналов
 import React, { useState } from 'react';
+// Форматирование объёма: 130M, 3.2B
+function formatVolume(value) {
+  if (value == null) return '';
+  if (value >= 1_000_000_000) {
+    return (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+  }
+  if (value >= 1_000_000) {
+    return Math.round(value / 1_000_000) + 'M';
+  }
+  return value.toLocaleString();
+}
 import { TF_LIST, SORT_DIRECTIONS } from '../utils/constants';
 import { sortSignals } from '../utils/signalHelpers';
 
@@ -94,7 +105,6 @@ const SignalsTable = ({ signals, loading, pinSignalsTop }) => {
                   {sortKey === 'symbol' ? (sortDir === SORT_DIRECTIONS.ASC ? '▲' : '▼') : '▲'}
                 </span>
               </th>
-              
               <th style={{
                 cursor: 'pointer',
                 padding: '12px 16px',
@@ -110,7 +120,6 @@ const SignalsTable = ({ signals, loading, pinSignalsTop }) => {
                   {sortKey === 'dailyVolume' ? (sortDir === SORT_DIRECTIONS.ASC ? '▲' : '▼') : '▲'}
                 </span>
               </th>
-              
               <th style={{
                 cursor: 'pointer',
                 padding: '12px 16px',
@@ -171,7 +180,7 @@ const SignalsTable = ({ signals, loading, pinSignalsTop }) => {
                   borderBottom: '1px solid #333',
                   color: '#aaa'
                 }}>
-                  {sig.dailyVolume ? Math.round(sig.dailyVolume).toLocaleString() : ''}
+                  {formatVolume(sig.dailyVolume)}
                 </td>
                 
                 <td style={{

@@ -20,7 +20,7 @@ class SystemManager {
       wsHost: options.wsHost || '0.0.0.0',
       
       // Фильтрация символов
-      minDailyVolume: options.minDailyVolume || 150000000, // 150 млн суточного объёма
+      minDailyVolume: options.minDailyVolume || 100000000, // 150 млн суточного объёма
       minNotional: options.minNotional || 0.4, // 0.4 NATR
       
       // Интервалы обновлений
