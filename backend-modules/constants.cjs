@@ -37,7 +37,7 @@ module.exports = {
   // Дефолтные настройки сигналов
   SIGNALS: {
     DEFAULT_PERCENTILE_WINDOW: 50,
-    DEFAULT_PERCENTILE_LEVEL: 5,
+    DEFAULT_PERCENTILE_LEVEL: 1,
     VALIDATION: {
       MIN_WINDOW: 5,
       MAX_WINDOW: 200,

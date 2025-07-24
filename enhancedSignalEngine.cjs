@@ -13,7 +13,7 @@ class EnhancedSignalEngine {
       smaLength: 200,
       thresholdPercent: 50,
       percentileWindow: 50,
-      percentileLevel: 5
+      percentileLevel: 1
     };
     
     // Поддерживаемые таймфреймы
