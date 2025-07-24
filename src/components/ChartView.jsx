@@ -34,10 +34,10 @@ const ChartView = ({
   // Состояние полноэкранного графика
   const [fullscreenChart, setFullscreenChart] = useState(null);
 
-  // Открытие по средней кнопке мыши
-  const handleChartMouseDown = (e, coin) => {
-    if (e.button === 1) { // средняя кнопка
-      e.preventDefault();
+  // Открытие по двойному клику
+  const handleChartDoubleClick = (e, coin) => {
+    // Только левая кнопка мыши
+    if (e.button === 0) {
       setFullscreenChart({
         symbol: coin.symbol,
         percentileWindow: appliedPercentileWindow,
@@ -220,8 +220,8 @@ const ChartView = ({
                 flexDirection: 'column',
                 cursor: 'pointer'
               }}
-                onMouseDown={(e) => handleChartMouseDown(e, coin)}
-                title="Открыть график на весь экран (средняя кнопка мыши)"
+                onDoubleClick={(e) => handleChartDoubleClick(e, coin)}
+                title="Открыть график на весь экран (двойной клик)"
               >
                 <div style={{ 
                   position: 'absolute', 
