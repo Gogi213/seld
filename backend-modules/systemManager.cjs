@@ -30,7 +30,7 @@ class SystemManager {
       
       // Дефолтные настройки сигналов
       defaultPercentileWindow: options.defaultPercentileWindow || 50,
-      defaultPercentileLevel: options.defaultPercentileLevel || 5
+      defaultPercentileLevel: options.defaultPercentileLevel || 1
     };
     
     // Основные компоненты
