@@ -3,7 +3,7 @@ export const TF_LIST = ["1m", "5m", "15m", "30m", "1h"];
 
 export const DEFAULT_SETTINGS = {
   PERCENTILE_WINDOW: 50,
-  PERCENTILE_LEVEL: 5,
+  PERCENTILE_LEVEL: 1,
   CHARTS_PER_PAGE: 9,
   SOUND_VOLUME: 0.85
 };
