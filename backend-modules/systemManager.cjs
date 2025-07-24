@@ -25,8 +25,8 @@ class SystemManager {
       
       // Интервалы обновлений
       symbolsUpdateInterval: options.symbolsUpdateInterval || 5 * 60 * 1000, // каждые 5 минут
-      dataCalculationInterval: options.dataCalculationInterval || 10 * 1000, // каждые 10 секунд
-      broadcastInterval: options.broadcastInterval || 15 * 1000, // каждые 15 секунд
+      dataCalculationInterval: options.dataCalculationInterval || 3 * 1000, // каждые 3 секунды
+      broadcastInterval: options.broadcastInterval || 3 * 1000, // каждые 3 секунды
       
       // Дефолтные настройки сигналов
       defaultPercentileWindow: options.defaultPercentileWindow || 50,
