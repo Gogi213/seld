@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import MultiChart from './MultiChart';
 
+import FullScreenChartView from './FullScreenChartView';
+
 const ChartView = ({ 
   currentPageCoins, 
   appliedPercentileWindow, 
@@ -28,6 +30,26 @@ const ChartView = ({
   // Глобальный таймфрейм для всех MultiChart
   const [selectedTimeframe, setSelectedTimeframe] = useState('5m');
   const timeframes = ['1m', '5m', '15m', '30m', '1h'];
+
+  // Состояние полноэкранного графика
+  const [fullscreenChart, setFullscreenChart] = useState(null);
+
+  // Открытие по средней кнопке мыши
+  const handleChartMouseDown = (e, coin) => {
+    if (e.button === 1) { // средняя кнопка
+      e.preventDefault();
+      setFullscreenChart({
+        symbol: coin.symbol,
+        percentileWindow: appliedPercentileWindow,
+        percentileLevel: appliedPercentileLevel,
+        selectedTimeframe
+      });
+    }
+  };
+
+  const handleCloseFullscreen = () => {
+    setFullscreenChart(null);
+  };
 
   return (
     <div style={{ 
@@ -195,8 +217,12 @@ const ChartView = ({
                 boxShadow: '0 0 8px #222', 
                 position: 'relative',
                 display: 'flex',
-                flexDirection: 'column'
-              }}>
+                flexDirection: 'column',
+                cursor: 'pointer'
+              }}
+                onMouseDown={(e) => handleChartMouseDown(e, coin)}
+                title="Открыть график на весь экран (средняя кнопка мыши)"
+              >
                 <div style={{ 
                   position: 'absolute', 
                   top: 4, 
@@ -222,7 +248,6 @@ const ChartView = ({
                     nATR: {coin.natr30m?.toFixed(2) || 'N/A'}
                   </span>
                 </div>
-                
                 <MultiChart
                   symbol={coin.symbol}
                   percentileWindow={appliedPercentileWindow}
@@ -237,6 +262,17 @@ const ChartView = ({
           <div style={{ color: '#888', fontSize: 20, textAlign: 'center', marginTop: '50px' }}>
             Нет данных для графиков
           </div>
+        )}
+        {/* Fullscreen overlay */}
+        {fullscreenChart && (
+          <FullScreenChartView
+            symbol={fullscreenChart.symbol}
+            percentileWindow={fullscreenChart.percentileWindow}
+            percentileLevel={fullscreenChart.percentileLevel}
+            candleData={candleData} // всегда актуальные данные
+            selectedTimeframe={fullscreenChart.selectedTimeframe}
+            onClose={handleCloseFullscreen}
+          />
         )}
       </div>
     </div>
