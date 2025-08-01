@@ -156,7 +156,7 @@ const ChartView = ({
               onChange={e => setPinSignalsTop(e.target.checked)}
               style={{ marginRight: 4 }}
             />
-            Закрепить монеты
+            Закрепить
           </label>
           {/* Панель таймфреймов справа */}
           <div style={{
