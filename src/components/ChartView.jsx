@@ -6,8 +6,7 @@ import FullScreenChartView from './FullScreenChartView';
 
 const ChartView = ({ 
   currentPageCoins, 
-  appliedPercentileWindow, 
-  appliedPercentileLevel, 
+  // ...existing code...
   candleData,
   currentPage,
   totalPages,
@@ -40,8 +39,7 @@ const ChartView = ({
     if (e.button === 0) {
       setFullscreenChart({
         symbol: coin.symbol,
-        percentileWindow: appliedPercentileWindow,
-        percentileLevel: appliedPercentileLevel,
+        // ...existing code...
         selectedTimeframe
       });
     }
@@ -250,8 +248,6 @@ const ChartView = ({
                 </div>
                 <MultiChart
                   symbol={coin.symbol}
-                  percentileWindow={appliedPercentileWindow}
-                  percentileLevel={appliedPercentileLevel}
                   candleData={candleData}
                   selectedTimeframe={selectedTimeframe}
                 />
@@ -267,8 +263,6 @@ const ChartView = ({
         {fullscreenChart && (
           <FullScreenChartView
             symbol={fullscreenChart.symbol}
-            percentileWindow={fullscreenChart.percentileWindow}
-            percentileLevel={fullscreenChart.percentileLevel}
             candleData={candleData} // всегда актуальные данные
             selectedTimeframe={fullscreenChart.selectedTimeframe}
             onClose={handleCloseFullscreen}

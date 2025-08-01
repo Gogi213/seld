@@ -2,8 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import LightweightChart from './LightweightChart_CDN';
 
-const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, selectedTimeframe: globalTimeframe }) => {
-  const timeframes = ['1m', '5m', '15m', '30m', '1h'];
+const MultiChart = ({ symbol, candleData, selectedTimeframe: globalTimeframe, fullscreenMode }) => {
+  // Таймфреймы для обычного и полноэкранного режима
+  const defaultTimeframes = ['1m', '5m', '15m', '30m', '1h'];
+  const timeframes = defaultTimeframes;
   const [selectedTimeframe, setSelectedTimeframe] = useState(globalTimeframe || '5m');
   const [wasLocalChange, setWasLocalChange] = useState(false);
   const [candles, setCandles] = useState([]);
@@ -38,15 +40,18 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
 
 
   // --- Оптимизация: вычисления только при изменении данных ---
+  // ...оставить только candles, без percentileWindow/Level...
   const [signalMarkersMemo, lowVolumeMarkersMemo] = React.useMemo(() => {
     let signalMarkers = [];
     let lowVolumeMarkers = [];
-    if (candles && candles.length >= (percentileWindow || 50) + 1) {
+    const percentileWindow = 50;
+    const percentileLevel = 1;
+    if (candles && candles.length >= percentileWindow + 1) {
       const volumes = candles.map(c => c.volume);
       const signalIndices = [];
-      for (let i = percentileWindow || 50; i < candles.length - 1; i++) {
+      for (let i = percentileWindow; i < candles.length - 1; i++) {
         const currentVolume = volumes[i];
-        const historicalVolumes = volumes.slice(Math.max(0, i - (percentileWindow || 50)), i);
+        const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
         const sorted = [...historicalVolumes].sort((a, b) => a - b);
         let rank = 0;
         for (let j = 0; j < sorted.length; j++) {
@@ -54,7 +59,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
           else break;
         }
         const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-        const hasSignal = percentileRank <= (percentileLevel || 5);
+        const hasSignal = percentileRank <= percentileLevel;
         if (hasSignal) {
           signalMarkers.push({
             time: candles[i].time,
@@ -83,7 +88,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
       }
     }
     return [signalMarkers, lowVolumeMarkers];
-  }, [candles, percentileWindow, percentileLevel]);
+  }, [candles]);
 
   // Определяем тип подсветки для каждого таймфрейма
   // blue: активный сигнал на последней закрытой
@@ -92,9 +97,11 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
   const highlightByTimeframe = React.useMemo(() => {
     if (!symbol || !candleData || !candleData[symbol]) return {};
     const result = {};
+    const percentileWindow = 50;
+    const percentileLevel = 1;
     timeframes.forEach(tf => {
       const candlesArr = candleData[symbol][tf];
-      if (!candlesArr || candlesArr.length < (percentileWindow || 50) + 2) {
+      if (!candlesArr || candlesArr.length < percentileWindow + 2) {
         result[tf] = 'transparent';
         return;
       }
@@ -105,9 +112,9 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
         const idxPrev = candlesArr.length - 3; // предпредыдущая закрытая
         // Проверка сигнала на последней
         let hasSignalLast = false;
-        if (idxLast >= (percentileWindow || 50)) {
+        if (idxLast >= percentileWindow) {
           const currentVolume = volumes[idxLast];
-          const historicalVolumes = volumes.slice(Math.max(0, idxLast - (percentileWindow || 50)), idxLast);
+          const historicalVolumes = volumes.slice(Math.max(0, idxLast - percentileWindow), idxLast);
           const sorted = [...historicalVolumes].sort((a, b) => a - b);
           let rank = 0;
           for (let j = 0; j < sorted.length; j++) {
@@ -115,13 +122,13 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
             else break;
           }
           const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-          hasSignalLast = percentileRank <= (percentileLevel || 5);
+          hasSignalLast = percentileRank <= percentileLevel;
         }
         // Проверка сигнала на предпредыдущей
         let hasSignalPrev = false;
-        if (idxPrev >= (percentileWindow || 50)) {
+        if (idxPrev >= percentileWindow) {
           const currentVolume = volumes[idxPrev];
-          const historicalVolumes = volumes.slice(Math.max(0, idxPrev - (percentileWindow || 50)), idxPrev);
+          const historicalVolumes = volumes.slice(Math.max(0, idxPrev - percentileWindow), idxPrev);
           const sorted = [...historicalVolumes].sort((a, b) => a - b);
           let rank = 0;
           for (let j = 0; j < sorted.length; j++) {
@@ -129,7 +136,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
             else break;
           }
           const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-          hasSignalPrev = percentileRank <= (percentileLevel || 5);
+          hasSignalPrev = percentileRank <= percentileLevel;
         }
         if (hasSignalLast) {
           result[tf] = 'blue';
@@ -142,9 +149,9 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
         // --- Для 1м ---
         // Найти последний сигнал на закрытой свече
         let lastSignalIdx = -1;
-        for (let i = candlesArr.length - 2; i >= (percentileWindow || 50); i--) {
+        for (let i = candlesArr.length - 2; i >= percentileWindow; i--) {
           const currentVolume = volumes[i];
-          const historicalVolumes = volumes.slice(Math.max(0, i - (percentileWindow || 50)), i);
+          const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
           const sorted = [...historicalVolumes].sort((a, b) => a - b);
           let rank = 0;
           for (let j = 0; j < sorted.length; j++) {
@@ -152,7 +159,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
             else break;
           }
           const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-          if (percentileRank <= (percentileLevel || 5)) {
+          if (percentileRank <= percentileLevel) {
             lastSignalIdx = i;
             break;
           }
@@ -167,7 +174,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
             let newSignal = false;
             for (let i = lastSignalIdx + 1; i <= candlesArr.length - 2; i++) {
               const currentVolume = volumes[i];
-              const historicalVolumes = volumes.slice(Math.max(0, i - (percentileWindow || 50)), i);
+              const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
               const sorted = [...historicalVolumes].sort((a, b) => a - b);
               let rank = 0;
               for (let j = 0; j < sorted.length; j++) {
@@ -175,7 +182,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
                 else break;
               }
               const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-              if (percentileRank <= (percentileLevel || 5)) {
+              if (percentileRank <= percentileLevel) {
                 newSignal = true;
                 break;
               }
@@ -194,7 +201,7 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
       }
     });
     return result;
-  }, [symbol, candleData, percentileWindow, percentileLevel, timeframes]);
+  }, [symbol, candleData, timeframes]);
 
   return (
     <div style={{
@@ -260,6 +267,18 @@ const MultiChart = ({ symbol, percentileWindow, percentileLevel, candleData, sel
           fontSize: `${14 / 1.2}px`
         }}>
           Загрузка графика...
+        </div>
+      ) : (selectedTimeframe === '15s' || selectedTimeframe === '30s') ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          color: '#888',
+          fontSize: `${16 / 1.2}px`,
+          fontWeight: 'bold'
+        }}>
+          Заглушка: {selectedTimeframe}
         </div>
       ) : candles.length === 0 ? (
         <div style={{

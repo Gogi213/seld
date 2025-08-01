@@ -17,10 +17,6 @@ import { DEFAULT_SETTINGS, TABS } from './utils/constants';
 
 function App() {
   // Состояние настроек
-  const [percentileWindow, setPercentileWindow] = useState(DEFAULT_SETTINGS.PERCENTILE_WINDOW);
-  const [percentileLevel, setPercentileLevel] = useState(DEFAULT_SETTINGS.PERCENTILE_LEVEL);
-  const [appliedPercentileWindow, setAppliedPercentileWindow] = useState(DEFAULT_SETTINGS.PERCENTILE_WINDOW);
-  const [appliedPercentileLevel, setAppliedPercentileLevel] = useState(DEFAULT_SETTINGS.PERCENTILE_LEVEL);
   const [reloadKey, setReloadKey] = useState(0);
   
   // Состояние UI
@@ -29,7 +25,8 @@ function App() {
 
   // Хуки
   const { soundEnabled, setSoundEnabled, checkForNewSignals } = useSignalSound();
-  const { signals, loading, candleData } = useWebSocket(appliedPercentileWindow, appliedPercentileLevel, reloadKey, checkForNewSignals);
+  // Используем дефолтные значения для useWebSocket
+  const { signals, loading, candleData } = useWebSocket(50, 1, reloadKey, checkForNewSignals);
   const pagination = usePagination(signals, pinSignalsTop, DEFAULT_SETTINGS.CHARTS_PER_PAGE);
 
   // Сброс страницы только при смене вкладки на графики
@@ -57,14 +54,6 @@ function App() {
         setActiveTab={setActiveTab}
         pinSignalsTop={pinSignalsTop}
         setPinSignalsTop={setPinSignalsTop}
-        percentileWindow={percentileWindow}
-        setPercentileWindow={setPercentileWindow}
-        percentileLevel={percentileLevel}
-        setPercentileLevel={setPercentileLevel}
-        appliedPercentileWindow={appliedPercentileWindow}
-        appliedPercentileLevel={appliedPercentileLevel}
-        setAppliedPercentileWindow={setAppliedPercentileWindow}
-        setAppliedPercentileLevel={setAppliedPercentileLevel}
         setReloadKey={setReloadKey}
         soundEnabled={soundEnabled}
         setSoundEnabled={setSoundEnabled}
@@ -83,8 +72,6 @@ function App() {
       {(activeTab === TABS.CHARTS || activeTab === 'alt') && (
         <ChartView
           currentPageCoins={pagination.currentPageCoins}
-          appliedPercentileWindow={appliedPercentileWindow}
-          appliedPercentileLevel={appliedPercentileLevel}
           candleData={candleData}
           currentPage={pagination.currentPage}
           totalPages={pagination.totalPages}

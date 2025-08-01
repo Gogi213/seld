@@ -4,8 +4,7 @@ import MultiChart from './MultiChart';
 
 const FullScreenChartView = ({
   symbol,
-  percentileWindow,
-  percentileLevel,
+  // ...existing code...
   candleData,
   selectedTimeframe,
   onClose
@@ -50,10 +49,9 @@ const FullScreenChartView = ({
       {/* Сам график */}
       <MultiChart
         symbol={symbol}
-        percentileWindow={percentileWindow}
-        percentileLevel={percentileLevel}
         candleData={candleData}
         selectedTimeframe={selectedTimeframe}
+        fullscreenMode={true}
       />
     </div>
   );

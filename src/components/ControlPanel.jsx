@@ -7,22 +7,11 @@ const ControlPanel = ({
   setActiveTab,
   pinSignalsTop,
   setPinSignalsTop,
-  percentileWindow,
-  setPercentileWindow,
-  percentileLevel,
-  setPercentileLevel,
-  appliedPercentileWindow,
-  appliedPercentileLevel,
-  setAppliedPercentileWindow,
-  setAppliedPercentileLevel,
+  // ...existing code...
   setReloadKey,
   CurrentTimeComponent
 }) => {
-  const handleApplySettings = () => {
-    setAppliedPercentileWindow(percentileWindow);
-    setAppliedPercentileLevel(percentileLevel);
-    setReloadKey(k => k + 1);
-  };
+  // ...existing code...
 
 
 
@@ -80,81 +69,22 @@ const ControlPanel = ({
               onChange={e => setPinSignalsTop(e.target.checked)}
               style={{ marginRight: 4 }}
             />
-            Закрепить монеты
+            Закрепить
           </label>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 12, 
-              padding: '8px 16px', 
-              background: '#222', 
-              borderRadius: '6px', 
-              border: '1px solid #333' 
-            }}>
-              <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
-                Окно:
-                <input
-                  type="number"
-                  min={5}
-                  max={200}
-                  value={percentileWindow}
-                  onChange={e => setPercentileWindow(Number(e.target.value))}
-                  style={{
-                    width: 50,
-                    marginLeft: 6,
-                    padding: '3px 6px',
-                    background: '#333',
-                    border: '1px solid #555',
-                    borderRadius: '3px',
-                    color: '#fff',
-                    fontSize: '13px'
-                  }}
-                />
-              </label>
-              
-              <label style={{ fontWeight: 500, color: '#ccc', fontSize: '13px' }}>
-                Порог (%):
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={percentileLevel}
-                  onChange={e => setPercentileLevel(Number(e.target.value))}
-                  style={{
-                    width: 45,
-                    marginLeft: 6,
-                    padding: '3px 6px',
-                    background: '#333',
-                    border: '1px solid #555',
-                    borderRadius: '3px',
-                    color: '#fff',
-                    fontSize: '13px'
-                  }}
-                />
-              </label>
-              
-              <button
-                onClick={handleApplySettings}
-                style={{
-                  padding: '5px 12px',
-                  fontWeight: 500,
-                  background: '#1976d2',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  boxShadow: '0 2px 4px rgba(25, 118, 210, 0.3)',
-                  marginRight: '10px'
-                }}
-              >
-                Применить
-              </button>
-              
-              <button
-                style={{
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 12, 
+        padding: '8px 16px', 
+        background: '#222', 
+        borderRadius: '6px', 
+        border: '1px solid #333' 
+      }}>
+        {/* ...оставшиеся элементы панели... */}
+        <button
+          style={{
                   padding: '5px 12px',
                   fontWeight: 500,
                   background: '#4caf50',
