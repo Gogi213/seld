@@ -9,6 +9,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
   const [isLoaded, setIsLoaded] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [chartReady, setChartReady] = useState(false);
+  const [showTools, setShowTools] = useState(false);
 
   // Проверяем, что мы на клиенте
   useEffect(() => {
@@ -28,7 +29,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
         }
 
         const script = document.createElement('script');
-        script.src = 'https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js';
+        script.src = '/line-tools/lightweight-charts.standalone.production.js';
         script.onload = () => {
           if (window.LightweightCharts) {
             resolve(window.LightweightCharts);
@@ -43,7 +44,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
 
     loadLightweightCharts()
       .then(() => {
-        console.log('✅ LightweightCharts загружен через CDN');
+        console.log('✅ LightweightCharts загружен из public/line-tools');
         setIsLoaded(true);
       })
       .catch(error => {
@@ -121,22 +122,22 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
           fontFamily: 'monospace',
         },
       });
-      
+
       // Проверяем, что chart корректно создался
       if (!chartRef.current || typeof chartRef.current.addCandlestickSeries !== 'function') {
         console.error('LightweightChart: chart не создался');
         return;
       }
-      
+
       console.log('✅ График создан успешно');
-      
+
       // Свечи на основной шкале с высокой точностью
       seriesRef.current = chartRef.current.addCandlestickSeries({
         priceScaleId: 'right',
         scaleMargins: { top: 0.2, bottom: 0.25 },
         priceFormat: { type: 'price', precision: 6, minMove: 0.000001 },
       });
-      
+
       // Объём на отдельной шкале снизу
       volumeSeriesRef.current = chartRef.current.addHistogramSeries({
         color: '#888888',
@@ -144,12 +145,12 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
         priceScaleId: 'volume',
         scaleMargins: { top: 0.8, bottom: 0 },
       });
-      
+
       chartRef.current.priceScale('volume').applyOptions({
         scaleMargins: { top: 0.8, bottom: 0 },
         borderVisible: false,
       });
-      
+
       // Сразу загружаем данные если они есть
       if (data && data.length) {
         seriesRef.current.setData(data);
@@ -160,28 +161,43 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
         }));
         volumeSeriesRef.current.setData(volumeData);
       }
-      
+
       // Сразу добавляем маркеры если они есть
       if (signalMarkers && signalMarkers.length) {
         seriesRef.current.setMarkers(signalMarkers);
       }
-      
+
       // Отмечаем график как готовый
       setChartReady(true);
-      
-    } catch (error) {
-      console.error('❌ Ошибка создания графика:', error);
-    }
 
-    return () => {
-      if (chartRef.current) {
+      // Показываем инструменты после инициализации
+      setShowTools(true);
+
+      // Подписка на события line tools
+      function lineToolWasDoubleClicked(params) {
+        console.log('LineTool double clicked:', params);
+      }
+      function lineToolFinishedEditingChart(params) {
+        console.log('LineTool finished editing:', params);
+      }
+      chartRef.current.subscribeLineToolsDoubleClick(lineToolWasDoubleClicked);
+      chartRef.current.subscribeLineToolsAfterEdit(lineToolFinishedEditingChart);
+
+      // Очистка подписок
+      return () => {
+        chartRef.current.unsubscribeLineToolsDoubleClick(lineToolWasDoubleClicked);
+        chartRef.current.unsubscribeLineToolsAfterEdit(lineToolFinishedEditingChart);
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
         volumeSeriesRef.current = null;
         setChartReady(false);
-      }
-    };
+        setShowTools(false);
+      };
+
+    } catch (error) {
+      console.error('❌ Ошибка создания графика:', error);
+    }
   }, [isLoaded, isClient, containerSize.width, containerSize.height, width, height]);
 
   // Обновление данных без пересоздания графика
@@ -229,7 +245,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
   }, [containerSize.width, containerSize.height, width, height]);
 
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }}>
+    <div ref={chartContainerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       {!isClient && (
         <div style={{
           display: 'flex',
@@ -254,6 +270,150 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
           fontSize: '14px'
         }}>
           Загрузка графика...
+        </div>
+      )}
+      {isClient && chartReady && showTools && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 56,
+            left: 2,
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            background: '#111',
+            border: '1px solid #333',
+            borderRadius: '6px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+            padding: '6px 3px',
+            alignItems: 'center',
+            width: '20px',
+          }}
+        >
+          {/* HorizontalLine */}
+          <button
+            title="Горизонтальный уровень"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '4px',
+              height: '18px',
+              width: '18px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                chartRef.current.addLineTool('HorizontalLine', [], {});
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onMouseEnter={e => e.currentTarget.style.background = '#222'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <line x1="3" y1="8" x2="13" y2="8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+          {/* HorizontalRay */}
+          <button
+            title="Горизонтальный луч"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '4px',
+              height: '18px',
+              width: '18px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                chartRef.current.addLineTool('HorizontalRay', [], {});
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onMouseEnter={e => e.currentTarget.style.background = '#222'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <line x1="3" y1="8" x2="13" y2="8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="13" cy="8" r="2" fill="#fff" />
+            </svg>
+          </button>
+          {/* TrendLine */}
+          <button
+            title="Трендовая линия"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '4px',
+              height: '18px',
+              width: '18px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                chartRef.current.addLineTool('TrendLine', [], {});
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onMouseEnter={e => e.currentTarget.style.background = '#222'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="4" cy="12" r="1.5" fill="#fff" />
+              <circle cx="12" cy="4" r="1.5" fill="#fff" />
+              <line x1="4" y1="12" x2="12" y2="4" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {/* Remove All Line Tools */}
+          <button
+            title="Удалить все рисовашки"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '4px',
+              height: '18px',
+              width: '18px',
+              marginTop: '4px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                chartRef.current.removeAllLineTools();
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onMouseEnter={e => e.currentTarget.style.background = '#222'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="3" y="7" width="10" height="2" rx="1" fill="#fff" />
+              <line x1="4" y1="4" x2="12" y2="12" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+              <line x1="12" y1="4" x2="4" y2="12" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
       )}
     </div>
