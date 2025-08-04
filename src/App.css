@@ -42,3 +42,56 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+  #root {
+    padding: 0.5rem;
+    max-width: 100%;
+  }
+  
+  .mobile-hidden {
+    display: none !important;
+  }
+  
+  .mobile-compact {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    gap: 8px !important;
+  }
+  
+  .mobile-flex-wrap {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  
+  .mobile-full-width {
+    width: 100% !important;
+  }
+  
+  .mobile-ascii-small {
+    font-size: 6px !important;
+    line-height: 6px !important;
+    padding: 4px !important;
+    margin-bottom: 8px !important;
+  }
+}
+
+/* Планшеты */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #root {
+    padding: 1rem;
+  }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 480px) {
+  #root {
+    padding: 0.25rem;
+  }
+  
+  .mobile-extra-small {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+  }
+}

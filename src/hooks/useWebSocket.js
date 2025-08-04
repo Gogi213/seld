@@ -5,6 +5,9 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [candleData, setCandleData] = useState({});
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const reconnectTimeout = useRef(null);
+  const wsRef = useRef(null);
   
   const prevParams = useRef({ 
     percentileWindow: appliedPercentileWindow, 
@@ -55,24 +58,23 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
     return merged;
   }, [checkForNewSignals]);
 
-  useEffect(() => {
-    let ws;
-    setLoading(true);
-    
-    const paramsChanged =
-      prevParams.current.percentileWindow !== appliedPercentileWindow ||
-      prevParams.current.percentileLevel !== appliedPercentileLevel;
-      
-    if (paramsChanged) {
-      setSignals([]);
+  const connectWebSocket = useCallback(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      return; // Уже подключен
     }
-    
+
     try {
       const wsUrl = `ws://${window.location.hostname}:3001`;
-      ws = new window.WebSocket(wsUrl);
+      const ws = new window.WebSocket(wsUrl);
+      wsRef.current = ws;
       
       ws.onopen = () => {
         console.log('🔌 WebSocket connected');
+        setReconnectAttempts(0);
+        const paramsChanged =
+          prevParams.current.percentileWindow !== appliedPercentileWindow ||
+          prevParams.current.percentileLevel !== appliedPercentileLevel;
+          
         if (paramsChanged) {
           ws.send(JSON.stringify({
             type: 'update_settings',
@@ -82,6 +84,29 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
             }
           }));
         }
+      };
+
+      ws.onclose = (event) => {
+        console.log('❌ WebSocket disconnected:', event.reason);
+        wsRef.current = null;
+        
+        // Переподключение с экспоненциальной задержкой
+        if (reconnectAttempts < 5) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+          console.log(`🔄 Переподключение через ${delay}ms (попытка ${reconnectAttempts + 1})`);
+          
+          reconnectTimeout.current = setTimeout(() => {
+            setReconnectAttempts(prev => prev + 1);
+            connectWebSocket();
+          }, delay);
+        } else {
+          console.error('🚫 Максимальное количество попыток переподключения достигнуто');
+          setLoading(false);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
       };
       
       ws.onmessage = (event) => {
@@ -101,6 +126,10 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
             if (message.data.candles) {
               setCandleData(message.data.candles);
             }
+            
+            const paramsChanged =
+              prevParams.current.percentileWindow !== appliedPercentileWindow ||
+              prevParams.current.percentileLevel !== appliedPercentileLevel;
             
             setSignals(prevSignals => {
               if (paramsChanged || message.type === 'settings_update') {
@@ -148,51 +177,65 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
                 const oldSignal = index >= 0 ? updated[index] : null;
                 
                 if (index >= 0) {
-                  updated[index] = symbolData;
+                  updated[index] = { ...updated[index], ...symbolData };
                 } else {
                   updated.push(symbolData);
+                  updated.sort((a, b) => a.symbol.localeCompare(b.symbol));
                 }
                 
-                // Проверяем новые сигналы для звука
                 if (checkForNewSignals) {
                   checkForNewSignals(oldSignal, symbolData, true);
                 }
                 
-                return updated.sort((a, b) => a.symbol.localeCompare(b.symbol));
+                return updated;
               });
             }
           }
-        } catch (e) {
-          console.error('Error parsing WebSocket message:', e);
+        } catch (error) {
+          console.error('❌ Ошибка парсинга WebSocket сообщения:', error);
         }
       };
       
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setLoading(false);
-      };
-      
-      ws.onclose = () => {
-        console.log('🔌 WebSocket disconnected');
-        setLoading(false);
-      };
-      
-    } catch (e) {
-      console.error('Error creating WebSocket:', e);
+    } catch (error) {
+      console.error('❌ Ошибка создания WebSocket:', error);
       setLoading(false);
     }
+  }, [appliedPercentileWindow, appliedPercentileLevel, processSignalUpdates, checkForNewSignals, reconnectAttempts]);
+
+  useEffect(() => {
+    setLoading(true);
     
-    prevParams.current = { 
-      percentileWindow: appliedPercentileWindow, 
-      percentileLevel: appliedPercentileLevel 
+    const paramsChanged =
+      prevParams.current.percentileWindow !== appliedPercentileWindow ||
+      prevParams.current.percentileLevel !== appliedPercentileLevel;
+      
+    if (paramsChanged) {
+      setSignals([]);
+    }
+    
+    // Очищаем предыдущий таймаут
+    if (reconnectTimeout.current) {
+      clearTimeout(reconnectTimeout.current);
+    }
+    
+    connectWebSocket();
+    
+    // Обновляем предыдущие параметры
+    prevParams.current = {
+      percentileWindow: appliedPercentileWindow,
+      percentileLevel: appliedPercentileLevel
     };
     
     return () => {
-      if (ws) {
-        ws.close();
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
     };
-  }, [reloadKey, appliedPercentileWindow, appliedPercentileLevel, processSignalUpdates]);
+  }, [reloadKey, appliedPercentileWindow, appliedPercentileLevel, connectWebSocket]);
 
   return {
     signals,

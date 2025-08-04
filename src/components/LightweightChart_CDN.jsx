@@ -10,9 +10,20 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
   const [isClient, setIsClient] = useState(false);
   const [chartReady, setChartReady] = useState(false);
   const [showTools, setShowTools] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // Массив для отслеживания созданных line tools
   const lineToolsRef = useRef([]);
+
+  // Обработчик изменения размера окна
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Генерируем ключ для сохранения рисунков по символу и таймфрейму
   const getStorageKey = () => {
@@ -364,7 +375,8 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
           Загрузка графика...
         </div>
       )}
-      {isClient && chartReady && showTools && (
+      {/* Панель инструментов скрыта на всех устройствах */}
+      {false && isClient && chartReady && showTools && !isMobile && (
         <div
           style={{
             position: 'absolute',
@@ -519,6 +531,126 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <rect x="3" y="7" width="10" height="2" rx="1" fill="#fff" />
+              <line x1="4" y1="4" x2="12" y2="12" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+              <line x1="12" y1="4" x2="4" y2="12" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
+      
+      {/* Мобильная панель инструментов скрыта */}
+      {false && isClient && chartReady && showTools && isMobile && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 10,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '8px',
+            background: '#111',
+            border: '1px solid #333',
+            borderRadius: '20px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            padding: '8px 12px',
+            alignItems: 'center',
+          }}
+        >
+          {/* HorizontalLine */}
+          <button
+            title="Горизонтальный уровень"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '50%',
+              height: '36px',
+              width: '36px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                const lineTool = chartRef.current.addLineTool('HorizontalLine', [], {});
+                if (lineTool && lineTool.id) {
+                  lineToolsRef.current.push(lineTool);
+                }
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onTouchStart={e => e.preventDefault()}
+          >
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+              <line x1="3" y1="8" x2="13" y2="8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+          
+          {/* TrendLine */}
+          <button
+            title="Трендовая линия"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '50%',
+              height: '36px',
+              width: '36px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                const lineTool = chartRef.current.addLineTool('TrendLine', [], {});
+                if (lineTool && lineTool.id) {
+                  lineToolsRef.current.push(lineTool);
+                }
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onTouchStart={e => e.preventDefault()}
+          >
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+              <circle cx="4" cy="12" r="1.5" fill="#fff" />
+              <circle cx="12" cy="4" r="1.5" fill="#fff" />
+              <line x1="4" y1="12" x2="12" y2="4" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {/* Remove All Line Tools */}
+          <button
+            title="Удалить все рисовашки"
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '50%',
+              height: '36px',
+              width: '36px',
+              transition: 'background 0.2s',
+            }}
+            onClick={() => {
+              if (chartRef.current) {
+                chartRef.current.removeAllLineTools();
+                lineToolsRef.current = [];
+                setTimeout(saveLineTools, 100);
+              }
+            }}
+            onMouseDown={e => e.preventDefault()}
+            onTouchStart={e => e.preventDefault()}
+          >
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
               <line x1="4" y1="4" x2="12" y2="12" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
               <line x1="12" y1="4" x2="4" y2="12" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
             </svg>

@@ -19,9 +19,75 @@ function App() {
   // Состояние настроек
   const [reloadKey, setReloadKey] = useState(0);
   
-  // Состояние UI
-  const [activeTab, setActiveTab] = useState(TABS.SIGNALS);
-  const [pinSignalsTop, setPinSignalsTop] = useState(true);
+  // Состояние UI с сохранением в localStorage
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem('activeTab') || TABS.SIGNALS;
+    } catch {
+      return TABS.SIGNALS;
+    }
+  });
+  const [pinSignalsTop, setPinSignalsTop] = useState(() => {
+    try {
+      return localStorage.getItem('pinSignalsTop') === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // Сохраняем состояние в localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('activeTab', activeTab);
+    } catch (e) {
+      console.warn('Не удалось сохранить activeTab:', e);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pinSignalsTop', pinSignalsTop.toString());
+    } catch (e) {
+      console.warn('Не удалось сохранить pinSignalsTop:', e);
+    }
+  }, [pinSignalsTop]);
+
+  // Обработчик изменения размера окна
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Обработка блокировки/разблокировки экрана
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Страница стала видимой - обновляем данные
+        console.log('📱 Страница стала видимой, обновляем данные...');
+        setReloadKey(prev => prev + 1);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Также обрабатываем фокус/расфокус окна
+    const handleFocus = () => {
+      console.log('📱 Окно получило фокус');
+      setReloadKey(prev => prev + 1);
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   // Хуки
   const { soundEnabled, setSoundEnabled, checkForNewSignals } = useSignalSound();
@@ -43,7 +109,7 @@ function App() {
 
   return (
     <div style={{ 
-      padding: 8, 
+      padding: isMobile ? 4 : 8, 
       paddingTop: 0, 
       minHeight: '100vh',
       color: '#fff'
@@ -57,7 +123,7 @@ function App() {
         setReloadKey={setReloadKey}
         soundEnabled={soundEnabled}
         setSoundEnabled={setSoundEnabled}
-        CurrentTimeComponent={<CurrentTime />}
+        CurrentTimeComponent={!isMobile ? <CurrentTime /> : null}
       />
 
       {/* Контент вкладок */}
