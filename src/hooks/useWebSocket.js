@@ -6,8 +6,10 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   const [loading, setLoading] = useState(true);
   const [candleData, setCandleData] = useState({});
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const reconnectTimeout = useRef(null);
   const wsRef = useRef(null);
+  const initialLoad = useRef(true); // Отслеживаем первую загрузку
   
   const prevParams = useRef({ 
     percentileWindow: appliedPercentileWindow, 
@@ -71,6 +73,8 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
       ws.onopen = () => {
         console.log('🔌 WebSocket connected');
         setReconnectAttempts(0);
+        setIsReconnecting(false);
+        
         const paramsChanged =
           prevParams.current.percentileWindow !== appliedPercentileWindow ||
           prevParams.current.percentileLevel !== appliedPercentileLevel;
@@ -89,6 +93,7 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
       ws.onclose = (event) => {
         console.log('❌ WebSocket disconnected:', event.reason);
         wsRef.current = null;
+        setIsReconnecting(true);
         
         // Переподключение с экспоненциальной задержкой
         if (reconnectAttempts < 5) {
@@ -101,7 +106,11 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
           }, delay);
         } else {
           console.error('🚫 Максимальное количество попыток переподключения достигнуто');
-          setLoading(false);
+          setIsReconnecting(false);
+          // НЕ сбрасываем loading, если у нас уже есть данные
+          if (initialLoad.current) {
+            setLoading(false);
+          }
         }
       };
 
@@ -139,7 +148,11 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
               }
             });
             
-            setLoading(false);
+            // Выключаем loading только при первой загрузке или смене параметров
+            if (initialLoad.current || paramsChanged || message.type === 'settings_update') {
+              setLoading(false);
+              initialLoad.current = false;
+            }
           } else if (message.type === 'periodic_update') {
             const validSignals = message.data.signals.filter(signal => 
               signal && 
@@ -203,12 +216,17 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   }, [appliedPercentileWindow, appliedPercentileLevel, processSignalUpdates, checkForNewSignals, reconnectAttempts]);
 
   useEffect(() => {
-    setLoading(true);
-    
+    // Проверяем, изменились ли параметры
     const paramsChanged =
       prevParams.current.percentileWindow !== appliedPercentileWindow ||
       prevParams.current.percentileLevel !== appliedPercentileLevel;
-      
+    
+    // Сбрасываем loading только если это первая загрузка или изменились параметры
+    if (initialLoad.current || paramsChanged) {
+      setLoading(true);
+    }
+    
+    // Очищаем сигналы только если изменились параметры
     if (paramsChanged) {
       setSignals([]);
     }
@@ -240,6 +258,7 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   return {
     signals,
     loading,
-    candleData
+    candleData,
+    isReconnecting
   };
 };

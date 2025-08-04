@@ -235,7 +235,8 @@ const ChartView = ({
         flex: 1, 
         padding: isMobile ? '8px' : '15px',
         overflow: isMobile ? 'auto' : 'hidden',
-        maxHeight: isMobile ? 'calc(100vh - 100px)' : 'auto'
+        maxHeight: isMobile ? 'calc(100vh - 100px)' : 'auto',
+        paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : '15px'
       }}>
         {currentPageCoins.length > 0 ? (
           <div style={{

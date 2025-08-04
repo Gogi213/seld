@@ -10,6 +10,7 @@ const ControlPanel = ({
   setReloadKey,
   soundEnabled,
   setSoundEnabled,
+  isReconnecting,
   CurrentTimeComponent
 }) => {
   // Определяем, является ли устройство мобильным
@@ -53,6 +54,23 @@ const ControlPanel = ({
           flexWrap: isMobile ? 'wrap' : 'nowrap',
           width: isMobile ? '100%' : 'auto'
         }}>
+          {/* Индикатор переподключения */}
+          {isReconnecting && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              background: '#ff9800',
+              color: '#000',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: isMobile ? '10px' : '12px',
+              fontWeight: '500'
+            }}>
+              🔄 Переподключение...
+            </div>
+          )}
+          
           <button onClick={() => setActiveTab('alt')} style={{
             padding: isMobile ? '12px' : '4px 16px',
             fontWeight: 500,

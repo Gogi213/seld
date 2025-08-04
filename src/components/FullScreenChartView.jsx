@@ -41,7 +41,13 @@ const FullScreenChartView = ({
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        // Безопасная область для полноэкранного режима
+        paddingTop: 'env(safe-area-inset-top, 0)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0)',
+        paddingLeft: 'env(safe-area-inset-left, 0)',
+        paddingRight: 'env(safe-area-inset-right, 0)',
+        boxSizing: 'border-box'
       }}
       onDoubleClick={handleDoubleClick}
       title="Выйти из полноэкранного режима (двойной клик)"

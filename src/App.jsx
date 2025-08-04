@@ -18,6 +18,7 @@ import { DEFAULT_SETTINGS, TABS } from './utils/constants';
 function App() {
   // Состояние настроек
   const [reloadKey, setReloadKey] = useState(0);
+  const [softReload, setSoftReload] = useState(false); // Мягкое обновление без сброса
   
   // Состояние UI с сохранением в localStorage
   const [activeTab, setActiveTab] = useState(() => {
@@ -92,7 +93,7 @@ function App() {
   // Хуки
   const { soundEnabled, setSoundEnabled, checkForNewSignals } = useSignalSound();
   // Используем дефолтные значения для useWebSocket
-  const { signals, loading, candleData } = useWebSocket(50, 1, reloadKey, checkForNewSignals);
+  const { signals, loading, candleData, isReconnecting } = useWebSocket(50, 1, reloadKey, checkForNewSignals);
   const pagination = usePagination(signals, pinSignalsTop, DEFAULT_SETTINGS.CHARTS_PER_PAGE);
 
   // Сброс страницы только при смене вкладки на графики
@@ -123,6 +124,7 @@ function App() {
         setReloadKey={setReloadKey}
         soundEnabled={soundEnabled}
         setSoundEnabled={setSoundEnabled}
+        isReconnecting={isReconnecting}
         CurrentTimeComponent={!isMobile ? <CurrentTime /> : null}
       />
 

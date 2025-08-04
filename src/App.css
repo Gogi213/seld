@@ -5,6 +5,11 @@
   background-color: #000;
   color: #fff;
   min-height: 100vh;
+  /* Безопасная область для полноэкранного режима */
+  padding-top: max(2rem, env(safe-area-inset-top));
+  padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  padding-left: max(2rem, env(safe-area-inset-left));
+  padding-right: max(2rem, env(safe-area-inset-right));
 }
 
 .logo {
@@ -48,6 +53,15 @@
   #root {
     padding: 0.5rem;
     max-width: 100%;
+    /* Мобильная безопасная область */
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+    /* Избегаем переполнения в полноэкранном режиме */
+    height: 100vh;
+    height: 100dvh; /* Динамическая высота viewport для современных браузеров */
+    overflow-y: auto;
   }
   
   .mobile-hidden {
@@ -88,10 +102,77 @@
 @media (max-width: 480px) {
   #root {
     padding: 0.25rem;
+    /* Очень компактная безопасная область */
+    padding-top: max(0.25rem, env(safe-area-inset-top));
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+    padding-left: max(0.25rem, env(safe-area-inset-left));
+    padding-right: max(0.25rem, env(safe-area-inset-right));
   }
   
   .mobile-extra-small {
     font-size: 10px !important;
     padding: 2px 4px !important;
   }
+}
+
+/* Полноэкранный режим */
+@media (display-mode: fullscreen) {
+  #root {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    padding: 0;
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+  
+  body {
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+  }
+  
+  html {
+    overflow: hidden;
+  }
+}
+
+/* Веб-приложение в полноэкранном режиме (PWA) */
+@media (display-mode: standalone) {
+  #root {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left, 0.5rem);
+    padding-right: env(safe-area-inset-right, 0.5rem);
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Стили для графиков в полноэкранном режиме */
+.chart-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.chart-grid {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Навигация в безопасной зоне */
+.chart-navigation {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 8px 16px;
+  z-index: 1000;
 }
