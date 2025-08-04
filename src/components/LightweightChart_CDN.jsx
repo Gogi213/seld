@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], width = 900, height = 500, symbol = '' }) => {
+const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], width = 900, height = 500, symbol = '', timeframe = 'default' }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef();
   const seriesRef = useRef();
@@ -10,6 +10,46 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
   const [isClient, setIsClient] = useState(false);
   const [chartReady, setChartReady] = useState(false);
   const [showTools, setShowTools] = useState(false);
+  
+  // Массив для отслеживания созданных line tools
+  const lineToolsRef = useRef([]);
+
+  // Генерируем ключ для сохранения рисунков по символу и таймфрейму
+  const getStorageKey = () => {
+    return `linetools_${symbol}_${timeframe}`;
+  };
+
+  // Сохранение рисунков в localStorage
+  const saveLineTools = () => {
+    if (!chartRef.current || !symbol) return;
+    try {
+      const lineToolsData = chartRef.current.exportLineTools();
+      const storageKey = getStorageKey();
+      localStorage.setItem(storageKey, lineToolsData);
+    } catch (error) {
+      console.error('❌ Ошибка сохранения рисунков:', error);
+    }
+  };
+
+  // Загрузка рисунков из localStorage
+  const loadLineTools = () => {
+    if (!chartRef.current || !symbol) return;
+    try {
+      const storageKey = getStorageKey();
+      const savedData = localStorage.getItem(storageKey);
+      if (savedData && savedData !== '[]') {
+        // Сначала удаляем все существующие рисунки, чтобы избежать дублирования
+        chartRef.current.removeAllLineTools();
+        
+        const success = chartRef.current.importLineTools(savedData);
+        if (success) {
+          // Загрузка прошла успешно
+        }
+      }
+    } catch (error) {
+      console.error('❌ Ошибка загрузки рисунков:', error);
+    }
+  };
 
   // Проверяем, что мы на клиенте
   useEffect(() => {
@@ -44,7 +84,6 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
 
     loadLightweightCharts()
       .then(() => {
-        console.log('✅ LightweightCharts загружен из public/line-tools');
         setIsLoaded(true);
       })
       .catch(error => {
@@ -129,7 +168,7 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
         return;
       }
 
-      console.log('✅ График создан успешно');
+
 
       // Свечи на основной шкале с высокой точностью
       seriesRef.current = chartRef.current.addCandlestickSeries({
@@ -175,18 +214,54 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
 
       // Подписка на события line tools
       function lineToolWasDoubleClicked(params) {
-        console.log('LineTool double clicked:', params);
+        // Пустая функция - двойной клик не используется
       }
+      
       function lineToolFinishedEditingChart(params) {
-        console.log('LineTool finished editing:', params);
+        // Добавляем line tool в наш массив если его там нет
+        if (params.selectedLineTool && !lineToolsRef.current.find(t => t.id === params.selectedLineTool.id)) {
+          lineToolsRef.current.push(params.selectedLineTool);
+        }
+        
+        // Автоматически сохраняем после каждого изменения
+        setTimeout(saveLineTools, 200);
       }
+
       chartRef.current.subscribeLineToolsDoubleClick(lineToolWasDoubleClicked);
       chartRef.current.subscribeLineToolsAfterEdit(lineToolFinishedEditingChart);
 
+      // Загружаем сохраненные рисунки
+      setTimeout(loadLineTools, 200);
+
+      // Добавляем обработчик средней кнопки мыши для удаления line tools
+      const handleMiddleClick = (event) => {
+        if (event.button === 1) { // Средняя кнопка мыши
+          event.preventDefault();
+          event.stopPropagation();
+          
+          if (lineToolsRef.current.length > 0) {
+            // Удаляем последний созданный line tool
+            lineToolsRef.current.pop(); // Удаляем из массива
+            chartRef.current.removeAllLineTools(); // Удаляем все
+            lineToolsRef.current = []; // Очищаем массив
+            setTimeout(saveLineTools, 100);
+          }
+        }
+      };
+
+      chartContainerRef.current.addEventListener('mousedown', handleMiddleClick);
+      chartContainerRef.current.addEventListener('auxclick', handleMiddleClick);
+
       // Очистка подписок
       return () => {
+        if (chartContainerRef.current) {
+          chartContainerRef.current.removeEventListener('mousedown', handleMiddleClick);
+          chartContainerRef.current.removeEventListener('auxclick', handleMiddleClick);
+        }
+        
         chartRef.current.unsubscribeLineToolsDoubleClick(lineToolWasDoubleClicked);
         chartRef.current.unsubscribeLineToolsAfterEdit(lineToolFinishedEditingChart);
+        
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
@@ -199,6 +274,19 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
       console.error('❌ Ошибка создания графика:', error);
     }
   }, [isLoaded, isClient, containerSize.width, containerSize.height, width, height]);
+
+  // Отдельный эффект для загрузки рисунков при смене символа/таймфрейма
+  useEffect(() => {
+    if (chartReady && symbol && timeframe) {
+      // Сначала очищаем текущие рисунки и наш массив
+      if (chartRef.current) {
+        chartRef.current.removeAllLineTools();
+        lineToolsRef.current = [];
+      }
+      // Затем загружаем новые
+      setTimeout(loadLineTools, 100);
+    }
+  }, [symbol, timeframe, chartReady]);
 
   // Обновление данных без пересоздания графика
   useEffect(() => {
@@ -245,7 +333,11 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
   }, [containerSize.width, containerSize.height, width, height]);
 
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div 
+      ref={chartContainerRef} 
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+      onContextMenu={(e) => e.preventDefault()} // Отключаем контекстное меню браузера
+    >
       {!isClient && (
         <div style={{
           display: 'flex',
@@ -309,7 +401,12 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
             }}
             onClick={() => {
               if (chartRef.current) {
-                chartRef.current.addLineTool('HorizontalLine', [], {});
+                const lineTool = chartRef.current.addLineTool('HorizontalLine', [], {});
+                
+                // Добавляем в наш массив сразу
+                if (lineTool && lineTool.id) {
+                  lineToolsRef.current.push(lineTool);
+                }
               }
             }}
             onMouseDown={e => e.preventDefault()}
@@ -338,7 +435,11 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
             }}
             onClick={() => {
               if (chartRef.current) {
-                chartRef.current.addLineTool('HorizontalRay', [], {});
+                const lineTool = chartRef.current.addLineTool('HorizontalRay', [], {});
+                
+                if (lineTool && lineTool.id) {
+                  lineToolsRef.current.push(lineTool);
+                }
               }
             }}
             onMouseDown={e => e.preventDefault()}
@@ -368,7 +469,11 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
             }}
             onClick={() => {
               if (chartRef.current) {
-                chartRef.current.addLineTool('TrendLine', [], {});
+                const lineTool = chartRef.current.addLineTool('TrendLine', [], {});
+                
+                if (lineTool && lineTool.id) {
+                  lineToolsRef.current.push(lineTool);
+                }
               }
             }}
             onMouseDown={e => e.preventDefault()}
@@ -402,6 +507,10 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
             onClick={() => {
               if (chartRef.current) {
                 chartRef.current.removeAllLineTools();
+                // Очищаем наш массив
+                lineToolsRef.current = [];
+                // Сохраняем состояние после удаления
+                setTimeout(saveLineTools, 100);
               }
             }}
             onMouseDown={e => e.preventDefault()}

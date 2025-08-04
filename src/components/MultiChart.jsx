@@ -299,6 +299,7 @@ const MultiChart = ({ symbol, candleData, selectedTimeframe: globalTimeframe, fu
           width="100%"
           height="100%"
           symbol={symbol ? symbol.replace('USDT', '') : ''}
+          timeframe={selectedTimeframe}
         />
       )}
     </div>
