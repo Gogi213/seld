@@ -84,70 +84,76 @@ const ChartView = ({
         padding: isMobile ? '0 8px' : '0 15px',
         flexShrink: 0
       }}>
-        {/* Левая часть - навигация по страницам */}
+        {/* Левая часть - навигация по страницам (скрыта на мобильных) */}
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: isMobile ? '8px' : '15px'
         }}>
-          <button 
-            onClick={goToPrevPage}
-            disabled={!canGoPrev}
-            style={{
-              background: !canGoPrev ? 'transparent' : '#333',
-              border: '1px solid #444',
-              color: !canGoPrev ? '#666' : '#fff',
-              borderRadius: '3px',
-              width: isMobile ? '24px' : '28px',
-              height: isMobile ? '24px' : '28px',
-              fontSize: isMobile ? '10px' : '12px',
-              cursor: !canGoPrev ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.2s ease'
-            }}
-            onMouseEnter={e => !canGoPrev ? null : e.target.style.background = '#444'}
-            onMouseLeave={e => !canGoPrev ? null : e.target.style.background = '#333'}
-          >
-            ◀
-          </button>
+          {/* Навигация по страницам - только для десктопа */}
+          {!isMobile && (
+            <>
+              <button 
+                onClick={goToPrevPage}
+                disabled={!canGoPrev}
+                style={{
+                  background: !canGoPrev ? 'transparent' : '#333',
+                  border: '1px solid #444',
+                  color: !canGoPrev ? '#666' : '#fff',
+                  borderRadius: '3px',
+                  width: '28px',
+                  height: '28px',
+                  fontSize: '12px',
+                  cursor: !canGoPrev ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseEnter={e => !canGoPrev ? null : e.target.style.background = '#444'}
+                onMouseLeave={e => !canGoPrev ? null : e.target.style.background = '#333'}
+              >
+                ◀
+              </button>
+              
+              {/* Индикатор страницы */}
+              <span style={{
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: '500',
+                padding: '0 8px',
+                background: '#222',
+                borderRadius: '4px',
+                border: '1px solid #444'
+              }}>
+                {currentPage} / {totalPages}
+              </span>
+              
+              <button 
+                onClick={goToNextPage}
+                disabled={!canGoNext}
+                style={{
+                  background: !canGoNext ? 'transparent' : '#333',
+                  border: '1px solid #444',
+                  color: !canGoNext ? '#666' : '#fff',
+                  borderRadius: '3px',
+                  width: '28px',
+                  height: '28px',
+                  fontSize: '12px',
+                  cursor: !canGoNext ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseEnter={e => !canGoNext ? null : e.target.style.background = '#444'}
+                onMouseLeave={e => !canGoNext ? null : e.target.style.background = '#333'}
+              >
+                ▶
+              </button>
+            </>
+          )}
           
-          {/* Индикатор страницы */}
-          <span style={{
-            color: '#fff',
-            fontSize: isMobile ? '11px' : '13px',
-            fontWeight: '500',
-            padding: '0 8px',
-            background: '#222',
-            borderRadius: '4px',
-            border: '1px solid #444'
-          }}>
-            {currentPage} / {totalPages}
-          </span>
-          
-          <button 
-            onClick={goToNextPage}
-            disabled={!canGoNext}
-            style={{
-              background: !canGoNext ? 'transparent' : '#333',
-              border: '1px solid #444',
-              color: !canGoNext ? '#666' : '#fff',
-              borderRadius: '3px',
-              width: isMobile ? '24px' : '28px',
-              height: isMobile ? '24px' : '28px',
-              fontSize: isMobile ? '10px' : '12px',
-              cursor: !canGoNext ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.2s ease'
-            }}
-            onMouseEnter={e => !canGoNext ? null : e.target.style.background = '#444'}
-            onMouseLeave={e => !canGoNext ? null : e.target.style.background = '#333'}
-          >
-            ▶
-          </button>
           <button 
             onClick={() => setActiveTab('signals')}
             style={{
