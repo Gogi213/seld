@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], width = 900, height = 500, symbol = '', timeframe = 'default' }) => {
+const LightweightChartCDN = React.memo(({ data, signalMarkers = [], lowVolumeMarkers = [], width = 900, height = 500, symbol = '', timeframe = 'default', fullscreenMode = false }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef();
   const seriesRef = useRef();
@@ -375,8 +375,8 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
           Загрузка графика...
         </div>
       )}
-      {/* Панель инструментов скрыта на всех устройствах */}
-      {false && isClient && chartReady && showTools && !isMobile && (
+      {/* Панель инструментов: включена на десктопе, на мобилке только в полноэкранном режиме */}
+      {((!isMobile) || (isMobile && fullscreenMode)) && isClient && chartReady && showTools && (
         <div
           style={{
             position: 'absolute',
@@ -538,8 +538,8 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
         </div>
       )}
       
-      {/* Мобильная панель инструментов скрыта */}
-      {false && isClient && chartReady && showTools && isMobile && (
+      {/* Мобильная панель инструментов удалена - используется основная панель */}
+      {false && (
         <div
           style={{
             position: 'absolute',
@@ -659,6 +659,6 @@ const LightweightChartCDN = ({ data, signalMarkers = [], lowVolumeMarkers = [], 
       )}
     </div>
   );
-};
+});
 
 export default LightweightChartCDN;

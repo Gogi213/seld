@@ -9,6 +9,7 @@ const BinanceApiService = require('./binanceApi.cjs');
 const SymbolManager = require('./symbolManager.cjs');
 const DataManager = require('./dataManager.cjs');
 const WebSocketServer = require('./webSocketServer.cjs');
+const MemoryMonitor = require('./memoryMonitor.cjs');
 const { WEBSOCKET, FILTERS, INTERVALS, SIGNALS, EMOJIS } = require('./constants.cjs');
 
 class SystemManager {
@@ -41,10 +42,12 @@ class SystemManager {
     this.symbolManager = null;
     this.dataManager = null;
     this.webSocketServer = null;
+    this.memoryMonitor = null;
     
     // Таймеры
     this.symbolsUpdateTimer = null;
     this.dataCalculationTimer = null;
+    this.cleanupTimer = null;
     
     // Состояние системы
     this.isInitialized = false;
@@ -88,6 +91,14 @@ class SystemManager {
         broadcastInterval: this.config.broadcastInterval
       });
       
+      // Инициализация монитора памяти
+      this.memoryMonitor = new MemoryMonitor({
+        warningThreshold: 512 * 1024 * 1024, // 512MB
+        criticalThreshold: 768 * 1024 * 1024, // 768MB
+        checkInterval: 30000, // 30 секунд
+        cleanupCallback: (level) => this.handleMemoryCleanup(level)
+      });
+      
       // Настройка обработчиков событий
       this._setupEventHandlers();
       
@@ -118,6 +129,9 @@ class SystemManager {
     try {
       // Запуск WebSocket сервера
       this.webSocketServer.start();
+      
+      // Запуск монитора памяти
+      this.memoryMonitor.start();
       
       // Первоначальное обновление активных символов
       await this.symbolManager.updateActiveSymbols();
@@ -153,6 +167,11 @@ class SystemManager {
     try {
       // Остановка периодических задач
       this._stopPeriodicTasks();
+      
+      // Остановка монитора памяти
+      if (this.memoryMonitor) {
+        this.memoryMonitor.stop();
+      }
       
       // Остановка WebSocket сервера
       if (this.webSocketServer) {
@@ -227,6 +246,15 @@ class SystemManager {
       }
     }, this.config.dataCalculationInterval);
     
+    // Периодическая очистка кэшей (каждые 10 минут)
+    this.cleanupTimer = setInterval(() => {
+      try {
+        this.performMaintenanceCleanup();
+      } catch (error) {
+        console.error('Error in cleanup task:', error);
+      }
+    }, 10 * 60 * 1000);
+    
     console.log('⏰ Periodic tasks started');
   }
 
@@ -245,7 +273,62 @@ class SystemManager {
       this.dataCalculationTimer = null;
     }
     
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    
     console.log('⏰ Periodic tasks stopped');
+  }
+
+  /**
+   * Плановая очистка кэшей
+   * @private
+   */
+  performMaintenanceCleanup() {
+    console.log('🧹 Performing maintenance cleanup...');
+    
+    // Очистка кэша свечей
+    if (this.candleAggregator) {
+      this.candleAggregator.cleanup();
+    }
+    
+    // Очистка кэша сигналов
+    if (this.signalEngine && typeof this.signalEngine.cleanupExpiredCache === 'function') {
+      this.signalEngine.cleanupExpiredCache();
+    }
+    
+    console.log('✅ Maintenance cleanup completed');
+  }
+
+  /**
+   * Обработчик критического уровня памяти
+   * @private
+   */
+  handleMemoryCleanup(level) {
+    console.log(`🧹 Handling memory cleanup for level: ${level}`);
+    
+    if (level === 'critical') {
+      // Принудительная очистка при критическом уровне
+      if (this.candleAggregator && typeof this.candleAggregator.forceCleanup === 'function') {
+        this.candleAggregator.forceCleanup();
+      }
+      
+      // Очистка кэша сигналов
+      if (this.signalEngine) {
+        this.signalEngine.signalCache.clear();
+        this.signalEngine.lastUpdateTime.clear();
+      }
+      
+      // Очистка предрассчитанных данных
+      if (this.dataManager) {
+        this.dataManager.preCalculatedData = null;
+      }
+      
+    } else if (level === 'warning') {
+      // Мягкая очистка при предупреждающем уровне
+      this.performMaintenanceCleanup();
+    }
   }
 
   /**

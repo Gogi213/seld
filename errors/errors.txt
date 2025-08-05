@@ -1,0 +1,38 @@
+LightweightChart.jsx:68 Uncaught TypeError: chartRef.current.addCandlestickSeries is not a function
+    at LightweightChart.jsx:68:42
+MultiChart.jsx:117 An error occurred in the <LightweightChart> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+LightweightChart.jsx:68 Uncaught TypeError: chartRef.current.addCandlestickSeries is not a function
+    at LightweightChart.jsx:68:42
+MultiChart.jsx:117 An error occurred in the <LightweightChart> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+LightweightChart.jsx:68 Uncaught TypeError: chartRef.current.addCandlestickSeries is not a function
+    at LightweightChart.jsx:68:42
+MultiChart.jsx:117 An error occurred in the <LightweightChart> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+LightweightChart.jsx:68 Uncaught TypeError: chartRef.current.addCandlestickSeries is not a function
+    at LightweightChart.jsx:68:42
+MultiChart.jsx:117 An error occurred in the <LightweightChart> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+LightweightChart.jsx:68 Uncaught TypeError: chartRef.current.addCandlestickSeries is not a function
+    at LightweightChart.jsx:68:42
+MultiChart.jsx:117 An error occurred in the <LightweightChart> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+LightweightChart.jsx:68 Uncaught TypeError: chartRef.current.addCandlestickSeries is not a function
+    at LightweightChart.jsx:68:42
+
+MultiChart.jsx:117 An error occurred in the <LightweightChart> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+App.jsx:286 WebSocket connection to 'ws://66.42.39.138:3001/' failed: WebSocket is closed before the connection is established.

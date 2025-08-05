@@ -9,7 +9,7 @@
     "start": "concurrently \"npm:dev\" \"npm:wait-electron\" \"npm:backend\"",
     "wait-electron": "wait-on http://localhost:5173 && electron .",
     "electron": "electron .",
-    "backend": "node backend-refactored.cjs",
+    "backend": "node --max-old-space-size=1024 --expose-gc backend-refactored.cjs",
     "backend-old": "node backend.cjs",
     "build": "vite build",
     "lint": "eslint .",

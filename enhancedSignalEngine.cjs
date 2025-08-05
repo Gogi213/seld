@@ -4,9 +4,15 @@
 class EnhancedSignalEngine {
   constructor(candleAggregator) {
     this.candleAggregator = candleAggregator;
-    this.signalEngines = new Map(); // symbol_timeframe -> VolumeSignalEngine
+    
+    // Оптимизированное кэширование - один движок для всех символов
+    this.sharedSignalEngine = null;
     this.signalCache = new Map(); // symbol -> signals for all timeframes
     this.lastUpdateTime = new Map(); // symbol -> timestamp
+    
+    // Лимиты для предотвращения утечек памяти
+    this.maxCacheEntries = 100; // Максимум 100 символов в кэше
+    this.cacheExpiryMs = 5 * 60 * 1000; // Кэш истекает через 5 минут
     
     // Настройки по умолчанию
     this.defaultSettings = {
@@ -27,38 +33,83 @@ class EnhancedSignalEngine {
       '30m': { expirePeriods: 1 },
       '1h': { expirePeriods: 1 }
     };
+    
+    // Периодическая очистка кэша
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredCache();
+    }, 60000); // Каждую минуту
   }
 
   // Обновить настройки
   updateSettings(settings) {
     this.defaultSettings = { ...this.defaultSettings, ...settings };
+    // Пересоздаем единый движок с новыми настройками
+    this.sharedSignalEngine = null;
     // Очищаем кэш при изменении настроек
-    this.signalEngines.clear();
     this.signalCache.clear();
+    this.lastUpdateTime.clear();
   }
 
-  // Получить или создать движок сигналов для символа и таймфрейма
-  getSignalEngine(symbol, timeframe) {
-    const key = `${symbol}_${timeframe}`;
-    
-    if (!this.signalEngines.has(key)) {
+  // Получить единый движок сигналов (ленивая инициализация)
+  getSharedSignalEngine() {
+    if (!this.sharedSignalEngine) {
       const VolumeSignalEngine = require('./signalEngine.cjs');
-      const engine = new VolumeSignalEngine(
+      this.sharedSignalEngine = new VolumeSignalEngine(
         this.defaultSettings.smaLength,
         this.defaultSettings.thresholdPercent,
         this.defaultSettings.percentileWindow,
         this.defaultSettings.percentileLevel
       );
-      this.signalEngines.set(key, engine);
+    }
+    return this.sharedSignalEngine;
+  }
+
+  // Очистка устаревшего кэша
+  cleanupExpiredCache() {
+    const now = Date.now();
+    let cleanedEntries = 0;
+    
+    for (const [symbol, updateTime] of this.lastUpdateTime.entries()) {
+      if (now - updateTime > this.cacheExpiryMs) {
+        this.signalCache.delete(symbol);
+        this.lastUpdateTime.delete(symbol);
+        cleanedEntries++;
+      }
     }
     
-    return this.signalEngines.get(key);
+    // Если кэш слишком большой, удаляем самые старые записи
+    if (this.signalCache.size > this.maxCacheEntries) {
+      const entries = Array.from(this.lastUpdateTime.entries());
+      entries.sort((a, b) => a[1] - b[1]); // Сортируем по времени
+      
+      const toRemove = this.signalCache.size - this.maxCacheEntries;
+      for (let i = 0; i < toRemove; i++) {
+        const symbol = entries[i][0];
+        this.signalCache.delete(symbol);
+        this.lastUpdateTime.delete(symbol);
+        cleanedEntries++;
+      }
+    }
+    
+    if (cleanedEntries > 0) {
+      console.log(`🧹 SignalEngine: cleaned ${cleanedEntries} expired cache entries`);
+    }
   }
 
   // Рассчитать сигналы для символа на всех таймфреймах
   calculateSignalsForSymbol(symbol) {
-    const signals = {};
     const currentTime = Date.now();
+    
+    // Проверяем кэш
+    const cached = this.signalCache.get(symbol);
+    const lastUpdate = this.lastUpdateTime.get(symbol);
+    
+    // Используем кэш, если он свежий (менее 30 секунд)
+    if (cached && lastUpdate && (currentTime - lastUpdate < 30000)) {
+      return cached;
+    }
+    
+    const signals = {};
     
     for (const tf of this.timeframes) {
       try {
@@ -263,16 +314,27 @@ class EnhancedSignalEngine {
   getCacheStats() {
     return {
       cachedSymbols: this.signalCache.size,
-      signalEngines: this.signalEngines.size,
-      lastUpdateTimes: this.lastUpdateTime.size
+      sharedSignalEngine: this.sharedSignalEngine ? 1 : 0,
+      lastUpdateTimes: this.lastUpdateTime.size,
+      maxCacheEntries: this.maxCacheEntries,
+      cacheExpiryMs: this.cacheExpiryMs
     };
   }
 
   // Очистить весь кэш
   clearAllCache() {
     this.signalCache.clear();
-    this.signalEngines.clear();
     this.lastUpdateTime.clear();
+    this.sharedSignalEngine = null;
+  }
+
+  // Деструктор - очистка интервала
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.clearAllCache();
   }
 }
 

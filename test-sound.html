@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Sound</title>
+</head>
+<body>
+    <h1>Test Sound</h1>
+    <button onclick="playSound()">Play Sound</button>
+    <script>
+        function playSound() {
+            try {
+                const audio = new Audio('/sounds/lighter.mp3');
+                audio.volume = 0.85;
+                audio.play().then(() => {
+                    console.log('Sound played successfully');
+                }).catch(e => {
+                    console.log('Failed to play sound:', e);
+                });
+            } catch (e) {
+                console.log('Error creating Audio:', e);
+            }
+        }
+    </script>
+</body>
+</html>

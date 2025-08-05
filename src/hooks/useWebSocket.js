@@ -1,5 +1,5 @@
 // useWebSocket.js - хук для управления WebSocket соединением
-import { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, reloadKey, checkForNewSignals) => {
   const [signals, setSignals] = useState([]);
@@ -59,6 +59,19 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
     
     return merged;
   }, [checkForNewSignals]);
+
+  // Разумный баланс: чуть более реалтайм, но не убиваем производительность
+  const updateCandleData = useCallback((newCandleData) => {
+    // 16ms = один фрейм анимации, незаметно для глаза, но батчит обновления
+    setTimeout(() => {
+      setCandleData(prev => ({ ...prev, ...newCandleData }));
+    }, 16);
+  }, []);
+
+  // Для сигналов - мгновенные обновления (они критичнее)
+  const updateSignalsInstant = useCallback((updateFn) => {
+    setSignals(updateFn);
+  }, []);
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -133,14 +146,14 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
             );
             
             if (message.data.candles) {
-              setCandleData(message.data.candles);
+              updateCandleData(message.data.candles);
             }
             
             const paramsChanged =
               prevParams.current.percentileWindow !== appliedPercentileWindow ||
               prevParams.current.percentileLevel !== appliedPercentileLevel;
             
-            setSignals(prevSignals => {
+            updateSignalsInstant(prevSignals => {
               if (paramsChanged || message.type === 'settings_update') {
                 return [...validSignals].sort((a, b) => a.symbol.localeCompare(b.symbol));
               } else {
@@ -164,18 +177,17 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
             );
             
             if (message.data.candles) {
-              setCandleData(message.data.candles);
+              updateCandleData(message.data.candles);
             }
             
-            setSignals(prevSignals => processSignalUpdates(prevSignals, validSignals, true));
+            updateSignalsInstant(prevSignals => processSignalUpdates(prevSignals, validSignals, true));
           } else if (message.type === 'symbol_update') {
             const symbolData = message.data.signal;
             
             if (message.data.candles) {
-              setCandleData(prev => ({
-                ...prev,
+              updateCandleData({
                 [message.symbol]: message.data.candles
-              }));
+              });
             }
             
             if (symbolData && 
@@ -184,7 +196,7 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
                 typeof symbolData.symbol === 'string' &&
                 !symbolData.loading &&
                 symbolData.dailyVolume !== undefined) {
-              setSignals(prevSignals => {
+              updateSignalsInstant(prevSignals => {
                 const updated = [...prevSignals];
                 const index = updated.findIndex(s => s.symbol === symbolData.symbol);
                 const oldSignal = index >= 0 ? updated[index] : null;
@@ -213,7 +225,7 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
       console.error('❌ Ошибка создания WebSocket:', error);
       setLoading(false);
     }
-  }, [appliedPercentileWindow, appliedPercentileLevel, processSignalUpdates, checkForNewSignals, reconnectAttempts]);
+  }, [appliedPercentileWindow, appliedPercentileLevel, processSignalUpdates, checkForNewSignals, reconnectAttempts, updateCandleData, updateSignalsInstant]);
 
   useEffect(() => {
     // Проверяем, изменились ли параметры

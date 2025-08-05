@@ -2,7 +2,149 @@
 import React, { useEffect, useState } from 'react';
 import LightweightChart from './LightweightChart_CDN';
 
-const MultiChart = ({ symbol, candleData, selectedTimeframe: globalTimeframe, fullscreenMode }) => {
+// Оптимизированная функция расчета процентиля вне компонента
+const calculatePercentileRank = (currentVolume, historicalVolumes) => {
+  const sorted = [...historicalVolumes].sort((a, b) => a - b);
+  let rank = 0;
+  for (let j = 0; j < sorted.length; j++) {
+    if (sorted[j] < currentVolume) rank++;
+    else break;
+  }
+  return (rank / Math.max(sorted.length - 1, 1)) * 100;
+};
+
+// Функция расчета сигналов вынесена отдельно для переиспользования
+const calculateSignalMarkers = (candles, percentileWindow = 50, percentileLevel = 1) => {
+  if (!candles || candles.length < percentileWindow + 1) {
+    return [[], []];
+  }
+
+  const volumes = candles.map(c => c.volume);
+  const signalIndices = [];
+  let signalMarkers = [];
+
+  for (let i = percentileWindow; i < candles.length - 1; i++) {
+    const currentVolume = volumes[i];
+    const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
+    const percentileRank = calculatePercentileRank(currentVolume, historicalVolumes);
+    
+    if (percentileRank <= percentileLevel) {
+      signalMarkers.push({
+        time: candles[i].time,
+        position: 'aboveBar',
+        color: '#38bdf8',
+        shape: 'circle',
+      });
+      signalIndices.push(i);
+    }
+  }
+
+  signalMarkers = signalMarkers.slice(-50);
+  let lowVolumeMarkers = [];
+
+  if (signalIndices.length > 0) {
+    const lastSignalIdx = signalIndices[signalIndices.length - 1];
+    const windowStart = Math.max(0, lastSignalIdx - 49);
+    const windowEnd = lastSignalIdx + 1;
+    const windowCandles = candles.slice(windowStart, windowEnd);
+    const sortedByVolume = windowCandles
+      .map((c, idx) => ({ idx: windowStart + idx, time: c.time, volume: c.volume }))
+      .sort((a, b) => a.volume - b.volume)
+      .slice(0, 3);
+    lowVolumeMarkers = sortedByVolume.map(item => ({
+      time: item.time,
+      color: '#fff',
+      idx: item.idx
+    }));
+  }
+
+  return [signalMarkers, lowVolumeMarkers];
+};
+
+// Функция расчета подсветки таймфреймов вынесена отдельно
+const calculateHighlightByTimeframe = (symbol, candleData, timeframes, percentileWindow = 50, percentileLevel = 1) => {
+  if (!symbol || !candleData || !candleData[symbol]) return {};
+  
+  const result = {};
+  
+  timeframes.forEach(tf => {
+    const candlesArr = candleData[symbol][tf];
+    if (!candlesArr || candlesArr.length < percentileWindow + 2) {
+      result[tf] = 'transparent';
+      return;
+    }
+    
+    const volumes = candlesArr.map(c => c.volume);
+    
+    if (tf !== '1m') {
+      const idxLast = candlesArr.length - 2;
+      const idxPrev = candlesArr.length - 3;
+      
+      let hasSignalLast = false;
+      if (idxLast >= percentileWindow) {
+        const currentVolume = volumes[idxLast];
+        const historicalVolumes = volumes.slice(Math.max(0, idxLast - percentileWindow), idxLast);
+        const percentileRank = calculatePercentileRank(currentVolume, historicalVolumes);
+        hasSignalLast = percentileRank <= percentileLevel;
+      }
+      
+      let hasSignalPrev = false;
+      if (idxPrev >= percentileWindow) {
+        const currentVolume = volumes[idxPrev];
+        const historicalVolumes = volumes.slice(Math.max(0, idxPrev - percentileWindow), idxPrev);
+        const percentileRank = calculatePercentileRank(currentVolume, historicalVolumes);
+        hasSignalPrev = percentileRank <= percentileLevel;
+      }
+      
+      if (hasSignalLast) {
+        result[tf] = 'blue';
+      } else if (hasSignalPrev) {
+        result[tf] = 'orange';
+      } else {
+        result[tf] = 'transparent';
+      }
+    } else {
+      // Для 1м таймфрейма
+      let lastSignalIdx = -1;
+      for (let i = candlesArr.length - 2; i >= percentileWindow; i--) {
+        const currentVolume = volumes[i];
+        const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
+        const percentileRank = calculatePercentileRank(currentVolume, historicalVolumes);
+        if (percentileRank <= percentileLevel) {
+          lastSignalIdx = i;
+          break;
+        }
+      }
+      
+      if (lastSignalIdx !== -1) {
+        const barsSinceSignal = candlesArr.length - 2 - lastSignalIdx;
+        if (barsSinceSignal === 0) {
+          result[tf] = 'blue';
+        } else if (barsSinceSignal > 0 && barsSinceSignal <= 4) {
+          let newSignal = false;
+          for (let i = lastSignalIdx + 1; i <= candlesArr.length - 2; i++) {
+            const currentVolume = volumes[i];
+            const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
+            const percentileRank = calculatePercentileRank(currentVolume, historicalVolumes);
+            if (percentileRank <= percentileLevel) {
+              newSignal = true;
+              break;
+            }
+          }
+          result[tf] = newSignal ? 'transparent' : 'orange';
+        } else {
+          result[tf] = 'transparent';
+        }
+      } else {
+        result[tf] = 'transparent';
+      }
+    }
+  });
+  
+  return result;
+};
+
+const MultiChart = React.memo(({ symbol, candleData, selectedTimeframe: globalTimeframe, fullscreenMode }) => {
   // Таймфреймы для обычного и полноэкранного режима
   const defaultTimeframes = ['1m', '5m', '15m', '30m', '1h'];
   const timeframes = defaultTimeframes;
@@ -39,169 +181,16 @@ const MultiChart = ({ symbol, candleData, selectedTimeframe: globalTimeframe, fu
   }, [symbol, selectedTimeframe, candleData]);
 
 
-  // --- Оптимизация: вычисления только при изменении данных ---
-  // ...оставить только candles, без percentileWindow/Level...
-  const [signalMarkersMemo, lowVolumeMarkersMemo] = React.useMemo(() => {
-    let signalMarkers = [];
-    let lowVolumeMarkers = [];
-    const percentileWindow = 50;
-    const percentileLevel = 1;
-    if (candles && candles.length >= percentileWindow + 1) {
-      const volumes = candles.map(c => c.volume);
-      const signalIndices = [];
-      for (let i = percentileWindow; i < candles.length - 1; i++) {
-        const currentVolume = volumes[i];
-        const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
-        const sorted = [...historicalVolumes].sort((a, b) => a - b);
-        let rank = 0;
-        for (let j = 0; j < sorted.length; j++) {
-          if (sorted[j] < currentVolume) rank++;
-          else break;
-        }
-        const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-        const hasSignal = percentileRank <= percentileLevel;
-        if (hasSignal) {
-          signalMarkers.push({
-            time: candles[i].time,
-            position: 'aboveBar',
-            color: '#38bdf8',
-            shape: 'circle',
-          });
-          signalIndices.push(i);
-        }
-      }
-      signalMarkers = signalMarkers.slice(-50);
-      if (signalIndices.length > 0) {
-        const lastSignalIdx = signalIndices[signalIndices.length - 1];
-        const windowStart = Math.max(0, lastSignalIdx - 49);
-        const windowEnd = lastSignalIdx + 1;
-        const windowCandles = candles.slice(windowStart, windowEnd);
-        const sortedByVolume = windowCandles
-          .map((c, idx) => ({ idx: windowStart + idx, time: c.time, volume: c.volume }))
-          .sort((a, b) => a.volume - b.volume)
-          .slice(0, 3);
-        lowVolumeMarkers = sortedByVolume.map(item => ({
-          time: item.time,
-          color: '#fff',
-          idx: item.idx
-        }));
-      }
-    }
-    return [signalMarkers, lowVolumeMarkers];
-  }, [candles]);
+  // --- Оптимизированные вычисления сигналов ---
+  const [signalMarkersMemo, lowVolumeMarkersMemo] = React.useMemo(() => 
+    calculateSignalMarkers(candles), [candles]
+  );
 
-  // Определяем тип подсветки для каждого таймфрейма
-  // blue: активный сигнал на последней закрытой
-  // orange: протухший сигнал (см. условия)
-  // transparent: нет сигнала
-  const highlightByTimeframe = React.useMemo(() => {
-    if (!symbol || !candleData || !candleData[symbol]) return {};
-    const result = {};
-    const percentileWindow = 50;
-    const percentileLevel = 1;
-    timeframes.forEach(tf => {
-      const candlesArr = candleData[symbol][tf];
-      if (!candlesArr || candlesArr.length < percentileWindow + 2) {
-        result[tf] = 'transparent';
-        return;
-      }
-      const volumes = candlesArr.map(c => c.volume);
-      // --- Для всех кроме 1м ---
-      if (tf !== '1m') {
-        const idxLast = candlesArr.length - 2; // последняя закрытая
-        const idxPrev = candlesArr.length - 3; // предпредыдущая закрытая
-        // Проверка сигнала на последней
-        let hasSignalLast = false;
-        if (idxLast >= percentileWindow) {
-          const currentVolume = volumes[idxLast];
-          const historicalVolumes = volumes.slice(Math.max(0, idxLast - percentileWindow), idxLast);
-          const sorted = [...historicalVolumes].sort((a, b) => a - b);
-          let rank = 0;
-          for (let j = 0; j < sorted.length; j++) {
-            if (sorted[j] < currentVolume) rank++;
-            else break;
-          }
-          const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-          hasSignalLast = percentileRank <= percentileLevel;
-        }
-        // Проверка сигнала на предпредыдущей
-        let hasSignalPrev = false;
-        if (idxPrev >= percentileWindow) {
-          const currentVolume = volumes[idxPrev];
-          const historicalVolumes = volumes.slice(Math.max(0, idxPrev - percentileWindow), idxPrev);
-          const sorted = [...historicalVolumes].sort((a, b) => a - b);
-          let rank = 0;
-          for (let j = 0; j < sorted.length; j++) {
-            if (sorted[j] < currentVolume) rank++;
-            else break;
-          }
-          const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-          hasSignalPrev = percentileRank <= percentileLevel;
-        }
-        if (hasSignalLast) {
-          result[tf] = 'blue';
-        } else if (hasSignalPrev) {
-          result[tf] = 'orange';
-        } else {
-          result[tf] = 'transparent';
-        }
-      } else {
-        // --- Для 1м ---
-        // Найти последний сигнал на закрытой свече
-        let lastSignalIdx = -1;
-        for (let i = candlesArr.length - 2; i >= percentileWindow; i--) {
-          const currentVolume = volumes[i];
-          const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
-          const sorted = [...historicalVolumes].sort((a, b) => a - b);
-          let rank = 0;
-          for (let j = 0; j < sorted.length; j++) {
-            if (sorted[j] < currentVolume) rank++;
-            else break;
-          }
-          const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-          if (percentileRank <= percentileLevel) {
-            lastSignalIdx = i;
-            break;
-          }
-        }
-        // Если сигнал был и держится 4 свечи, и после него не было новых сигналов
-        if (lastSignalIdx !== -1) {
-          const barsSinceSignal = candlesArr.length - 2 - lastSignalIdx;
-          if (barsSinceSignal === 0) {
-            result[tf] = 'blue';
-          } else if (barsSinceSignal > 0 && barsSinceSignal <= 4) {
-            // Проверяем, не было ли новых сигналов после lastSignalIdx
-            let newSignal = false;
-            for (let i = lastSignalIdx + 1; i <= candlesArr.length - 2; i++) {
-              const currentVolume = volumes[i];
-              const historicalVolumes = volumes.slice(Math.max(0, i - percentileWindow), i);
-              const sorted = [...historicalVolumes].sort((a, b) => a - b);
-              let rank = 0;
-              for (let j = 0; j < sorted.length; j++) {
-                if (sorted[j] < currentVolume) rank++;
-                else break;
-              }
-              const percentileRank = (rank / Math.max(sorted.length - 1, 1)) * 100;
-              if (percentileRank <= percentileLevel) {
-                newSignal = true;
-                break;
-              }
-            }
-            if (!newSignal) {
-              result[tf] = 'orange';
-            } else {
-              result[tf] = 'transparent';
-            }
-          } else {
-            result[tf] = 'transparent';
-          }
-        } else {
-          result[tf] = 'transparent';
-        }
-      }
-    });
-    return result;
-  }, [symbol, candleData, timeframes]);
+  // Оптимизированный расчет подсветки таймфреймов
+  const highlightByTimeframe = React.useMemo(() => 
+    calculateHighlightByTimeframe(symbol, candleData, timeframes), 
+    [symbol, candleData, timeframes]
+  );
 
   return (
     <div style={{
@@ -300,10 +289,11 @@ const MultiChart = ({ symbol, candleData, selectedTimeframe: globalTimeframe, fu
           height="100%"
           symbol={symbol ? symbol.replace('USDT', '') : ''}
           timeframe={selectedTimeframe}
+          fullscreenMode={fullscreenMode}
         />
       )}
     </div>
   );
-};
+});
 
 export default MultiChart;

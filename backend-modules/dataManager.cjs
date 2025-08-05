@@ -163,7 +163,7 @@ class DataManager {
         default: maxCandles = 800;
       }
       // Для 1m используем максимально доступное количество свечей
-      const actualLimit = tf === '1m' ? 4000 : maxCandles;
+      const actualLimit = tf === '1m' ? 1000 : maxCandles; // Уменьшено с 4000 до 1000
       // ...
       const candles = this.candleAggregator.getAggregatedCandles(symbol, tf, actualLimit);
       candleData[tf] = candles.map(c => ({
@@ -184,11 +184,15 @@ class DataManager {
    * @private
    */
   _generateStats() {
+    const candleStats = this.candleAggregator ? this.candleAggregator.getCacheStats() : null;
+    const signalStats = this.signalEngine ? this.signalEngine.getCacheStats() : null;
+    const symbolStats = this.symbolManager ? this.symbolManager.getStats() : null;
+    
     return {
-      totalSymbols: this.symbolManager.getActiveSymbolsCount(),
-      candleAggregator: this.candleAggregator.getCacheStats(),
-      signalEngine: this.signalEngine.getCacheStats(),
-      symbolManager: this.symbolManager.getStats(),
+      totalSymbols: this.symbolManager ? this.symbolManager.getActiveSymbolsCount() : 0,
+      candleAggregator: candleStats,
+      signalEngine: signalStats,
+      symbolManager: symbolStats,
       dataManager: {
         lastCalculation: this.lastDataCalculation,
         cacheInterval: this.cacheInterval,

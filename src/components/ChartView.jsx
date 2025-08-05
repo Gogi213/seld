@@ -4,7 +4,7 @@ import MultiChart from './MultiChart';
 
 import FullScreenChartView from './FullScreenChartView';
 
-const ChartView = ({ 
+const ChartView = React.memo(({ 
   currentPageCoins, 
   candleData,
   currentPage,
@@ -320,6 +320,6 @@ const ChartView = ({
       </div>
     </div>
   );
-};
+});
 
 export default ChartView;

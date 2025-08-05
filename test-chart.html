@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Lightweight Charts</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #111;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #chart {
+            width: 600px;
+            height: 400px;
+            margin: 20px 0;
+            border: 1px solid #333;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background: #0a4d0a; }
+        .error { background: #4d0a0a; }
+        .info { background: #0a2a4d; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Lightweight Charts</h1>
+    <div id="status" class="status info">Загрузка...</div>
+    
+    <div id="chart"></div>
+    
+    <div id="details"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const chartDiv = document.getElementById('chart');
+        const detailsDiv = document.getElementById('details');
+
+        function log(message, type = 'info') {
+            console.log(message);
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            detailsDiv.appendChild(div);
+        }
+
+        async function testChart() {
+            try {
+                log('🚀 Начинаем тест lightweight-charts...');
+                
+                // Проверяем, что мы в браузере
+                if (typeof window === 'undefined') {
+                    throw new Error('Не в браузере');
+                }
+                log('✅ Браузерная среда определена');
+
+                // Пытаемся импортировать
+                log('📦 Импортируем lightweight-charts...');
+                const { createChart } = await import('https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js');
+                
+                if (!createChart) {
+                    throw new Error('createChart не найден');
+                }
+                log('✅ createChart импортирован');
+
+                // Создаем график
+                log('🎨 Создаем график...');
+                const chart = createChart(chartDiv, {
+                    width: 600,
+                    height: 400,
+                    layout: {
+                        background: { color: '#111' },
+                        textColor: '#DDD',
+                    },
+                    grid: {
+                        vertLines: { color: '#222' },
+                        horzLines: { color: '#222' },
+                    },
+                });
+
+                if (!chart) {
+                    throw new Error('График не создался');
+                }
+                log('✅ График создан');
+
+                // Добавляем серию
+                log('📈 Добавляем данные...');
+                const series = chart.addCandlestickSeries();
+                
+                // Тестовые данные
+                const testData = [
+                    { time: '2023-12-01', open: 100, high: 110, low: 95, close: 105 },
+                    { time: '2023-12-02', open: 105, high: 115, low: 100, close: 108 },
+                    { time: '2023-12-03', open: 108, high: 120, low: 102, close: 112 },
+                    { time: '2023-12-04', open: 112, high: 118, low: 106, close: 115 },
+                    { time: '2023-12-05', open: 115, high: 125, low: 110, close: 120 },
+                ];
+
+                series.setData(testData);
+                log('✅ Данные добавлены');
+
+                statusDiv.textContent = '🎉 ТЕСТ ПРОШЕЛ УСПЕШНО!';
+                statusDiv.className = 'status success';
+                
+                log('🎯 Все работает! lightweight-charts полностью функционален', 'success');
+
+            } catch (error) {
+                console.error('❌ Ошибка:', error);
+                statusDiv.textContent = `❌ ОШИБКА: ${error.message}`;
+                statusDiv.className = 'status error';
+                
+                log(`❌ Ошибка: ${error.message}`, 'error');
+                log(`📋 Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        // Запускаем тест
+        testChart();
+    </script>
+</body>
+</html>

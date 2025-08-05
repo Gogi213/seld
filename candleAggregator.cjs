@@ -5,18 +5,30 @@ class CandleAggregator {
   constructor() {
     // Кэш для хранения 1m свечей по символам
     this.minuteCandles = new Map(); // symbol -> array of 1m candles
-    // Кэш агрегированных данных
+    // Кэш агрегированных данных с LRU механизмом
     this.aggregatedCache = new Map(); // symbol_timeframe -> array of candles
-    // Максимальное количество 1m свечей для хранения (около 2.7 дней = 4000 минут)
-    this.maxMinuteCandles = 4000;
+    this.cacheAccessOrder = new Map(); // symbol_timeframe -> timestamp
+    
+    // Лимиты для предотвращения утечек памяти
+    this.maxMinuteCandles = 2000; // Уменьшено с 4000 до 2000 (1.4 дня)
+    this.maxSymbols = 50; // Максимум 50 символов в кэше одновременно
+    this.maxAggregatedCache = 200; // Максимум 200 записей в агрегированном кэше
+    
+    // Счетчики для мониторинга
+    this.cleanupCounter = 0;
+    this.lastCleanup = Date.now();
   }
 
   // Добавить новую 1-минутную свечу
   addMinuteCandle(symbol, candle) {
+    // Проверяем лимиты перед добавлением
+    this.enforceSymbolLimits();
+    
     if (!this.minuteCandles.has(symbol)) {
       this.minuteCandles.set(symbol, []);
     }
     const candles = this.minuteCandles.get(symbol);
+    
     // Проверяем, не дублируется ли свеча по времени
     const existingIndex = candles.findIndex(c => c.openTime === candle.openTime);
     if (existingIndex !== -1) {
@@ -36,6 +48,31 @@ class CandleAggregator {
     this.invalidateAggregatedCache(symbol);
   }
 
+  // Принудительное соблюдение лимитов символов
+  enforceSymbolLimits() {
+    if (this.minuteCandles.size >= this.maxSymbols) {
+      // Находим самый старый символ (LRU) и удаляем его
+      let oldestTime = Date.now();
+      let oldestSymbol = null;
+      
+      for (const [symbol, candles] of this.minuteCandles.entries()) {
+        if (candles.length > 0) {
+          const lastCandleTime = candles[candles.length - 1].openTime;
+          if (lastCandleTime < oldestTime) {
+            oldestTime = lastCandleTime;
+            oldestSymbol = symbol;
+          }
+        }
+      }
+      
+      if (oldestSymbol) {
+        this.minuteCandles.delete(oldestSymbol);
+        this.invalidateAggregatedCache(oldestSymbol);
+        console.log(`🧹 Removed old symbol from cache: ${oldestSymbol}`);
+      }
+    }
+  }
+
   // Инвалидация кэша агрегированных данных
   invalidateAggregatedCache(symbol) {
     const keysToDelete = [];
@@ -50,6 +87,9 @@ class CandleAggregator {
   // Получить агрегированные свечи для указанного таймфрейма
   getAggregatedCandles(symbol, timeframe, limit = 4000) {
     const cacheKey = `${symbol}_${timeframe}`;
+    
+    // Обновляем время доступа для LRU
+    this.cacheAccessOrder.set(cacheKey, Date.now());
     
     // Проверяем кэш
     if (this.aggregatedCache.has(cacheKey)) {
@@ -67,16 +107,43 @@ class CandleAggregator {
     if (intervalMinutes === 1) {
       // Для 1m просто возвращаем исходные данные
       const result = minuteCandles.slice(-limit);
-      this.aggregatedCache.set(cacheKey, result);
-      // ...
+      this.setAggregatedCache(cacheKey, result);
       return result;
     }
     
     // Агрегируем данные
     const aggregated = this.aggregateCandles(minuteCandles, intervalMinutes);
-    this.aggregatedCache.set(cacheKey, aggregated);
+    this.setAggregatedCache(cacheKey, aggregated);
     
     return aggregated.slice(-limit);
+  }
+
+  // Установить данные в агрегированный кэш с проверкой лимитов
+  setAggregatedCache(cacheKey, data) {
+    // Проверяем лимиты кэша
+    if (this.aggregatedCache.size >= this.maxAggregatedCache) {
+      this.cleanupAggregatedCache();
+    }
+    
+    this.aggregatedCache.set(cacheKey, data);
+    this.cacheAccessOrder.set(cacheKey, Date.now());
+  }
+
+  // Очистка агрегированного кэша по LRU принципу
+  cleanupAggregatedCache() {
+    const entries = Array.from(this.cacheAccessOrder.entries());
+    entries.sort((a, b) => a[1] - b[1]); // Сортируем по времени доступа
+    
+    // Удаляем 25% самых старых записей
+    const toRemove = Math.ceil(entries.length * 0.25);
+    for (let i = 0; i < toRemove; i++) {
+      const keyToRemove = entries[i][0];
+      this.aggregatedCache.delete(keyToRemove);
+      this.cacheAccessOrder.delete(keyToRemove);
+    }
+    
+    this.cleanupCounter++;
+    console.log(`🧹 Cleaned up ${toRemove} entries from aggregated cache (cleanup #${this.cleanupCounter})`);
   }
 
   // Преобразование таймфрейма в минуты
@@ -212,16 +279,59 @@ class CandleAggregator {
     };
   }
 
-  // Очистка старых данных
-  cleanup(maxAgeMs = 24 * 60 * 60 * 1000) { // 24 часа по умолчанию
+  // Очистка старых данных с улучшенной логикой
+  cleanup(maxAgeMs = 12 * 60 * 60 * 1000) { // 12 часов по умолчанию (уменьшено с 24)
     const cutoffTime = Date.now() - maxAgeMs;
+    let cleanedSymbols = 0;
+    let cleanedCandles = 0;
     
     for (const [symbol, candles] of this.minuteCandles.entries()) {
       const filteredCandles = candles.filter(c => c.openTime >= cutoffTime);
       if (filteredCandles.length !== candles.length) {
-        this.minuteCandles.set(symbol, filteredCandles);
+        cleanedCandles += candles.length - filteredCandles.length;
+        if (filteredCandles.length === 0) {
+          // Удаляем символ полностью, если все свечи устарели
+          this.minuteCandles.delete(symbol);
+          cleanedSymbols++;
+        } else {
+          this.minuteCandles.set(symbol, filteredCandles);
+        }
         this.invalidateAggregatedCache(symbol);
       }
+    }
+    
+    // Принудительная очистка агрегированного кэша
+    this.cleanupAggregatedCache();
+    
+    if (cleanedSymbols > 0 || cleanedCandles > 0) {
+      console.log(`🧹 Cleanup completed: removed ${cleanedSymbols} symbols, ${cleanedCandles} candles`);
+    }
+    
+    this.lastCleanup = Date.now();
+  }
+
+  // Принудительная очистка памяти
+  forceCleanup() {
+    const before = this.getCacheStats();
+    
+    // Очищаем весь агрегированный кэш
+    this.aggregatedCache.clear();
+    this.cacheAccessOrder.clear();
+    
+    // Оставляем только последние 1000 свечей для каждого символа
+    for (const [symbol, candles] of this.minuteCandles.entries()) {
+      if (candles.length > 1000) {
+        this.minuteCandles.set(symbol, candles.slice(-1000));
+      }
+    }
+    
+    const after = this.getCacheStats();
+    console.log(`🧹 Force cleanup: ${before.totalMinuteCandles} -> ${after.totalMinuteCandles} candles, ${before.totalAggregatedCandles} -> ${after.totalAggregatedCandles} aggregated`);
+    
+    // Принудительный garbage collection, если доступен
+    if (global.gc) {
+      global.gc();
+      console.log('🧹 Forced garbage collection');
     }
   }
 }
