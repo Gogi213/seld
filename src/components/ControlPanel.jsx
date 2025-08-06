@@ -10,7 +10,8 @@ const ControlPanel = ({
   setReloadKey,
   soundEnabled,
   setSoundEnabled,
-  isReconnecting,
+  audioInitialized,
+  initializeAudio,
   CurrentTimeComponent
 }) => {
   // Определяем, является ли устройство мобильным
@@ -54,22 +55,6 @@ const ControlPanel = ({
           flexWrap: isMobile ? 'wrap' : 'nowrap',
           width: isMobile ? '100%' : 'auto'
         }}>
-          {/* Индикатор переподключения */}
-          {isReconnecting && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              background: '#ff9800',
-              color: '#000',
-              padding: '4px 8px',
-              borderRadius: 4,
-              fontSize: isMobile ? '10px' : '12px',
-              fontWeight: '500'
-            }}>
-              🔄 Переподключение...
-            </div>
-          )}
           
           <button onClick={() => setActiveTab('alt')} style={{
             padding: isMobile ? '12px' : '4px 16px',
@@ -130,7 +115,12 @@ const ControlPanel = ({
                 border: '1px solid #333' 
               }}>
                 <button
-                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  onClick={() => {
+                    if (!audioInitialized) {
+                      initializeAudio();
+                    }
+                    setSoundEnabled(!soundEnabled);
+                  }}
                   style={{
                     padding: '5px 12px',
                     fontWeight: 500,
@@ -145,6 +135,15 @@ const ControlPanel = ({
                 >
                   {soundEnabled ? 'Выключить звук' : 'Включить звук'}
                 </button>
+                {!audioInitialized && (
+                  <span style={{ 
+                    fontSize: '11px', 
+                    color: '#ff9800',
+                    fontWeight: 500
+                  }}>
+                    (клик для активации)
+                  </span>
+                )}
               </div>
             </div>
           )}

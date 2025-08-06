@@ -133,8 +133,14 @@ class WebSocketServer {
       });
       
     } catch (error) {
-      console.error('Error sending initial data:', error);
+      console.error('❌ Error sending initial data:', error);
+      console.error('Error stack:', error.stack);
       this._sendError(ws, 'Failed to load initial data');
+      
+      // Закрываем соединение с ошибкой
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1011, 'Initial data error');
+      }
     }
   }
 
@@ -226,8 +232,17 @@ class WebSocketServer {
    */
   _sendToClient(ws, message) {
     if (ws.readyState === WebSocket.OPEN) {
-      // ...
-      ws.send(JSON.stringify(message));
+      try {
+        const jsonString = JSON.stringify(message);
+        ws.send(jsonString);
+      } catch (error) {
+        console.error('❌ Error serializing message:', error);
+        console.error('Message type:', message?.type);
+        console.error('Message data size:', message?.data ? Object.keys(message.data).length : 'no data');
+        
+        // Закрываем соединение с ошибкой
+        ws.close(1011, 'Data serialization error');
+      }
     }
   }
 

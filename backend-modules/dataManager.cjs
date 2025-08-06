@@ -76,50 +76,79 @@ class DataManager {
    * Генерация полных данных для клиентов
    */
   generateClientData(percentileWindow, percentileLevel) {
-    // Обновляем настройки движка сигналов
-    this.signalEngine.updateSettings({
-      percentileWindow,
-      percentileLevel
-    });
-    
-    const results = [];
-    const candleData = {};
-    const activeSymbols = this.symbolManager.getActiveSymbols();
-    
-    // Рассчитываем сигналы для всех активных символов
-    for (const symbol of activeSymbols) {
-      const symbolData = this.symbolManager.getSymbolData(symbol);
-      if (!symbolData) continue;
+    try {
+      console.log(`🔧 Generating client data for ${percentileWindow}w/${percentileLevel}%`);
       
-      // Рассчитываем сигналы
-      const signals = this.signalEngine.calculateSignalsForSymbol(symbol);
+      // Обновляем настройки движка сигналов
+      this.signalEngine.updateSettings({
+        percentileWindow,
+        percentileLevel
+      });
       
-      // Формируем данные для таблицы с cellState
-      const tableData = {
-        symbol,
-        dailyVolume: symbolData.dailyVolume,
-        natr30m: symbolData.natr30m,
-        ...signals
+      const results = [];
+      const candleData = {};
+      const activeSymbols = this.symbolManager.getActiveSymbols();
+      
+      console.log(`📊 Processing ${activeSymbols.length} active symbols`);
+      
+      // Рассчитываем сигналы для всех активных символов
+      for (const symbol of activeSymbols) {
+        try {
+          const symbolData = this.symbolManager.getSymbolData(symbol);
+          if (!symbolData) {
+            console.warn(`⚠️ No data for symbol ${symbol}`);
+            continue;
+          }
+          
+          // Рассчитываем сигналы
+          const signals = this.signalEngine.calculateSignalsForSymbol(symbol);
+          
+          // Формируем данные для таблицы с cellState
+          const tableData = {
+            symbol,
+            dailyVolume: symbolData.dailyVolume,
+            natr30m: symbolData.natr30m,
+            ...signals
+          };
+          
+          // Добавляем cellState для каждого таймфрейма
+          this._addCellStates(tableData, signals);
+          
+          results.push(tableData);
+          
+          // Формируем данные свечей для графиков
+          candleData[symbol] = this._generateCandleData(symbol);
+          
+        } catch (symbolError) {
+          console.error(`❌ Error processing symbol ${symbol}:`, symbolError.message);
+          // Продолжаем обработку остальных символов
+        }
+      }
+      
+      // Сортируем результаты по NATR
+      results.sort((a, b) => (b.natr30m || 0) - (a.natr30m || 0));
+      
+      console.log(`✅ Generated data for ${results.length} symbols`);
+      
+      return {
+        signals: results,
+        candles: candleData,
+        timestamp: Date.now(),
+        stats: this._generateStats()
       };
       
-      // Добавляем cellState для каждого таймфрейма
-      this._addCellStates(tableData, signals);
+    } catch (error) {
+      console.error('❌ Error in generateClientData:', error);
+      console.error('Error stack:', error.stack);
       
-      results.push(tableData);
-      
-      // Формируем данные свечей для графиков
-      candleData[symbol] = this._generateCandleData(symbol);
+      // Возвращаем пустые данные в случае критической ошибки
+      return {
+        signals: [],
+        candles: {},
+        timestamp: Date.now(),
+        stats: this._generateStats()
+      };
     }
-    
-    // Сортируем результаты по NATR
-    results.sort((a, b) => (b.natr30m || 0) - (a.natr30m || 0));
-    
-    return {
-      signals: results,
-      candles: candleData,
-      timestamp: Date.now(),
-      stats: this._generateStats()
-    };
   }
 
   /**

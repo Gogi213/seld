@@ -27,11 +27,11 @@ class EnhancedSignalEngine {
     
     // Настройки истечения сигналов для разных таймфреймов
     this.expireSettings = {
-      '1m': { expirePeriods: 3 }, // 1m истекает через 3 свечи
-      '5m': { expirePeriods: 1 }, // остальные через 1 свечу
-      '15m': { expirePeriods: 1 },
-      '30m': { expirePeriods: 1 },
-      '1h': { expirePeriods: 1 }
+      '1m': { expirePeriods: 3 }, // 1m истекает через 3 свечи (3 минуты)
+      '5m': { expirePeriods: 1 }, // 5m истекает через 1 свечу (5 минут)
+      '15m': { expirePeriods: 1 }, // 15m истекает через 1 свечу (15 минут)
+      '30m': { expirePeriods: 1 }, // 30m истекает через 1 свечу (30 минут)
+      '1h': { expirePeriods: 1 }   // 1h истекает через 1 свечу (1 час)
     };
     
     // Периодическая очистка кэша

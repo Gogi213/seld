@@ -10,6 +10,7 @@ const SymbolManager = require('./symbolManager.cjs');
 const DataManager = require('./dataManager.cjs');
 const WebSocketServer = require('./webSocketServer.cjs');
 const MemoryMonitor = require('./memoryMonitor.cjs');
+const TelegramBot = require('./telegramBot.cjs');
 const { WEBSOCKET, FILTERS, INTERVALS, SIGNALS, EMOJIS } = require('./constants.cjs');
 
 class SystemManager {
@@ -26,8 +27,8 @@ class SystemManager {
       
       // Интервалы обновлений
       symbolsUpdateInterval: options.symbolsUpdateInterval || 5 * 60 * 1000, // каждые 5 минут
-      dataCalculationInterval: options.dataCalculationInterval || 3 * 1000, // каждые 3 секунды
-      broadcastInterval: options.broadcastInterval || 3 * 1000, // каждые 3 секунды
+      dataCalculationInterval: options.dataCalculationInterval || 2 * 1000, // каждые 2 секунды
+      broadcastInterval: options.broadcastInterval || 2 * 1000, // каждые 2 секунды
       
       // Дефолтные настройки сигналов
       defaultPercentileWindow: options.defaultPercentileWindow || 50,
@@ -43,6 +44,7 @@ class SystemManager {
     this.dataManager = null;
     this.webSocketServer = null;
     this.memoryMonitor = null;
+    this.telegramBot = null;
     
     // Таймеры
     this.symbolsUpdateTimer = null;
@@ -52,6 +54,7 @@ class SystemManager {
     // Состояние системы
     this.isInitialized = false;
     this.isRunning = false;
+    this.lastSignalStates = new Map(); // symbol -> {1m: bool, 5m: bool} для трекинга новых сигналов
   }
 
   /**
@@ -97,6 +100,15 @@ class SystemManager {
         criticalThreshold: 768 * 1024 * 1024, // 768MB
         checkInterval: 30000, // 30 секунд
         cleanupCallback: (level) => this.handleMemoryCleanup(level)
+      });
+      
+      // Инициализация Telegram бота
+      this.telegramBot = new TelegramBot({
+        botToken: process.env.TELEGRAM_BOT_TOKEN || '7669528584:AAEz-BE8fs7v5Eq1ema3AD0n2wvejNm9ibw',
+        chatId: process.env.TELEGRAM_CHAT_ID || '-1002565633603', // Ваш Chat ID
+        threadId: process.env.TELEGRAM_THREAD_ID || '4294969041', // Thread ID вашей темы
+        enabledTimeframes: ['1m', '5m'],
+        signalCooldown: 15000 // 15 секунд между одинаковыми сигналами (было 30000)
       });
       
       // Настройка обработчиков событий
@@ -211,9 +223,16 @@ class SystemManager {
         trades: kline.n
       });
       
-      // Если свеча закрыта, отправляем обновление клиентам
-      if (kline.x && this.webSocketServer && this.webSocketServer.getClientsCount() > 0) {
+      // Проверяем сигналы на каждом обновлении (не только когда свеча закрыта)
+      if (this.webSocketServer && this.webSocketServer.getClientsCount() > 0) {
         this.webSocketServer.broadcastSymbolUpdate(symbol);
+      }
+      
+      // КРИТИЧЕСКИ ВАЖНО: Проверяем сигналы для Telegram ТОЛЬКО когда свеча закрывается!
+      // Это гарантирует отправку зеленых (свежих) сигналов, а не желтых (протухших)
+      if (kline.x === true) {
+        console.log(`🕐 Candle closed for ${symbol}, checking signals...`);
+        this._checkTelegramSignals(symbol);
       }
     });
     
@@ -363,8 +382,121 @@ class SystemManager {
   }
 
   /**
-   * Обновить конфигурацию системы
+   * Проверка и отправка сигналов в Telegram
+   * @private
    */
+  async _checkTelegramSignals(symbol) {
+    if (!this.telegramBot || !this.telegramBot.isEnabled) {
+      return;
+    }
+
+    try {
+      // Получаем данные символа
+      const symbolData = this.dataManager.generateSymbolData(
+        symbol,
+        this.dataManager.defaultSettings.percentileWindow,
+        this.dataManager.defaultSettings.percentileLevel
+      );
+
+      if (!symbolData || !symbolData.signal) {
+        return;
+      }
+
+      const signalData = symbolData.signal;
+      
+      // Получаем последнее состояние сигналов для этого символа
+      const lastStates = this.lastSignalStates.get(symbol) || { '1m': false, '5m': false };
+      const currentStates = { '1m': false, '5m': false };
+
+      // Проверяем сигналы для 1m и 5m
+      for (const timeframe of ['1m', '5m']) {
+        const hasActiveSignal = signalData[`percentileSignal_${timeframe}`];
+        const hasExpiredSignal = signalData[`percentileSignalExpired_${timeframe}`];
+        
+        // Обновляем текущее состояние
+        currentStates[timeframe] = hasActiveSignal && !hasExpiredSignal;
+        
+        // Отправляем только НОВЫЕ активные сигналы (которых не было в прошлый раз)
+        const isNewSignal = currentStates[timeframe] && !lastStates[timeframe];
+        
+        if (isNewSignal) {
+          console.log(`🔥 NEW ${timeframe} signal detected for ${symbol}!`);
+          
+          // Передаем полные данные символа
+          const fullData = {
+            symbol: symbol,
+            ...symbolData,
+            ...signalData // объединяем данные сигнала
+          };
+          
+          await this.telegramBot.sendSignal(fullData, timeframe);
+        }
+      }
+      
+      // Сохраняем текущее состояние для следующей проверки
+      this.lastSignalStates.set(symbol, currentStates);
+      
+    } catch (error) {
+      console.error(`❌ Error checking Telegram signals for ${symbol}:`, error);
+    }
+  }
+
+  /**
+   * Отправка сводки сигналов в Telegram
+   */
+  async sendTelegramSignalsSummary() {
+    if (!this.telegramBot || !this.telegramBot.isEnabled) {
+      return { success: false, error: 'Telegram bot not enabled' };
+    }
+
+    try {
+      const data = this.dataManager.getPreCalculatedData();
+      if (!data || !data.signals) {
+        return { success: false, error: 'No signals data available' };
+      }
+
+      return await this.telegramBot.sendSignalsSummary(data.signals);
+    } catch (error) {
+      console.error('❌ Error sending Telegram signals summary:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Настройка Telegram бота
+   * @param {string} chatId - ID чата для отправки сообщений
+   * @param {string|null} threadId - ID темы в группе (опционально)
+   */
+  async setupTelegramBot(chatId, threadId = null) {
+    if (!this.telegramBot) {
+      return { success: false, error: 'Telegram bot not initialized' };
+    }
+
+    return await this.telegramBot.setupChatAndThread(chatId, threadId);
+  }
+
+  /**
+   * Отправка тестового сообщения в Telegram
+   */
+  async sendTelegramTest() {
+    if (!this.telegramBot || !this.telegramBot.isEnabled) {
+      return { success: false, error: 'Telegram bot not enabled' };
+    }
+
+    return await this.telegramBot.sendTestMessage();
+  }
+
+  /**
+   * Получение статистики Telegram бота
+   */
+  getTelegramStats() {
+    if (!this.telegramBot) {
+      return { success: false, error: 'Telegram bot not initialized' };
+    }
+
+    return this.telegramBot.getStats();
+  }
+
   updateConfig(newConfig) {
     const oldConfig = { ...this.config };
     this.config = { ...this.config, ...newConfig };

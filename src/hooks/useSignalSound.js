@@ -1,10 +1,29 @@
 // useSignalSound.js - хук для управления звуковыми уведомлениями
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 const tfList = ["1m", "5m", "15m", "30m", "1h"];
 
 export const useSignalSound = () => {
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  // Инициализируем soundEnabled из localStorage
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('soundEnabled');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [audioInitialized, setAudioInitialized] = useState(false);
+  const audioRef = useRef(null);
+  
+  // Сохраняем состояние soundEnabled в localStorage при изменении
+  useEffect(() => {
+    try {
+      localStorage.setItem('soundEnabled', JSON.stringify(soundEnabled));
+    } catch (e) {
+      console.warn('Не удалось сохранить состояние звука:', e);
+    }
+  }, [soundEnabled]);
   
   // Система предотвращения дребезга
   const lastSoundTime = useRef(new Map()); // symbol+tf -> timestamp
@@ -13,18 +32,54 @@ export const useSignalSound = () => {
   const ANTI_BOUNCE_TIME = 120000; // 2 минуты для отслеживания дребезга
   const MAX_BOUNCES = 3; // максимум 3 срабатывания за период
 
-  const playSignalSound = useCallback(() => {
-    if (!soundEnabled) return;
-    try {
-      const audio = new Audio('/sounds/lighter.mp3');
-      audio.volume = 1.0;
-      audio.play().catch(e => {
-        console.log('Не удалось воспроизвести звук:', e);
-      });
-    } catch (e) {
-      console.log('Ошибка при создании Audio:', e);
+  // Инициализация аудио при первом взаимодействии
+  const initializeAudio = useCallback(() => {
+    if (!audioRef.current) {
+      try {
+        audioRef.current = new Audio('/sounds/lighter.mp3');
+        audioRef.current.volume = 1.0;
+        audioRef.current.preload = 'auto';
+        
+        // Пытаемся проиграть и сразу же поставить на паузу для инициализации
+        audioRef.current.play().then(() => {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          setAudioInitialized(true);
+          console.log('🔊 Аудио инициализировано');
+        }).catch(e => {
+          console.log('Аудио будет инициализировано при первом клике:', e.message);
+        });
+      } catch (e) {
+        console.log('Ошибка при создании Audio:', e);
+      }
     }
-  }, [soundEnabled]);
+  }, []);
+
+  const playSignalSound = useCallback(() => {
+    if (!soundEnabled) {
+      console.log('🔇 Звук отключен, не воспроизводим');
+      return;
+    }
+    
+    if (!audioRef.current) {
+      initializeAudio();
+      return;
+    }
+    
+    try {
+      // Сбрасываем позицию и играем
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => {
+        console.log('Не удалось воспроизвести звук:', e.message);
+        if (e.name === 'NotAllowedError' && !audioInitialized) {
+          console.log('💡 Кликните в любом месте страницы для активации звука');
+        }
+      });
+      console.log('🔊 Воспроизводим звук сигнала');
+    } catch (e) {
+      console.log('Ошибка при воспроизведении:', e);
+    }
+  }, [soundEnabled, audioInitialized, initializeAudio]);
 
   const checkForNewSignals = useCallback((oldSignal, newSignal, playSound = false) => {
     let hasNewActiveSignals = false;
@@ -128,6 +183,8 @@ export const useSignalSound = () => {
     soundEnabled,
     setSoundEnabled,
     playSignalSound,
-    checkForNewSignals
+    checkForNewSignals,
+    audioInitialized,
+    initializeAudio
   };
 };

@@ -68,9 +68,9 @@ function App() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Страница стала видимой - обновляем данные
-        console.log('📱 Страница стала видимой, обновляем данные...');
-        setReloadKey(prev => prev + 1);
+        // Страница стала видимой - логируем но НЕ пересоздаем WebSocket
+        console.log('📱 Страница стала видимой');
+        // setReloadKey(prev => prev + 1); // Убираем пересоздание WS
       }
     };
 
@@ -79,7 +79,8 @@ function App() {
     // Также обрабатываем фокус/расфокус окна
     const handleFocus = () => {
       console.log('📱 Окно получило фокус');
-      setReloadKey(prev => prev + 1);
+      // Убираем автоматическое обновление при фокусе
+      // setReloadKey(prev => prev + 1);
     };
 
     window.addEventListener('focus', handleFocus);
@@ -91,10 +92,24 @@ function App() {
   }, []);
 
   // Хуки
-  const { soundEnabled, setSoundEnabled, checkForNewSignals } = useSignalSound();
+  const { soundEnabled, setSoundEnabled, checkForNewSignals, audioInitialized, initializeAudio } = useSignalSound();
   // Используем дефолтные значения для useWebSocket
-  const { signals, loading, candleData, isReconnecting } = useWebSocket(50, 1, reloadKey, checkForNewSignals);
+  const { signals, loading, candleData } = useWebSocket(50, 1, reloadKey, checkForNewSignals);
   const pagination = usePagination(signals, pinSignalsTop, DEFAULT_SETTINGS.CHARTS_PER_PAGE);
+
+  // Инициализация аудио при первом клике
+  useEffect(() => {
+    const handleFirstClick = () => {
+      if (!audioInitialized) {
+        initializeAudio();
+      }
+    };
+
+    document.addEventListener('click', handleFirstClick, { once: true });
+    return () => {
+      document.removeEventListener('click', handleFirstClick);
+    };
+  }, [audioInitialized, initializeAudio]);
 
   // Сброс страницы только при смене вкладки на графики
   const prevTab = React.useRef(activeTab);
@@ -124,8 +139,9 @@ function App() {
         setReloadKey={setReloadKey}
         soundEnabled={soundEnabled}
         setSoundEnabled={setSoundEnabled}
-        isReconnecting={isReconnecting}
-        CurrentTimeComponent={!isMobile ? <CurrentTime /> : null}
+        audioInitialized={audioInitialized}
+        initializeAudio={initializeAudio}
+        CurrentTimeComponent={<CurrentTime />}
       />
 
       {/* Контент вкладок */}

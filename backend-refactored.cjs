@@ -16,8 +16,8 @@ const systemConfig = {
   
   // Интервалы обновлений
   symbolsUpdateInterval: INTERVALS.SYMBOLS_UPDATE,
-  dataCalculationInterval: INTERVALS.DATA_CALCULATION,
-  broadcastInterval: INTERVALS.BROADCAST,
+  dataCalculationInterval: 2 * 1000, // каждые 2 секунды
+  broadcastInterval: 2 * 1000, // каждые 2 секунды
   
   // Дефолтные настройки сигналов
   defaultPercentileWindow: SIGNALS.DEFAULT_PERCENTILE_WINDOW,

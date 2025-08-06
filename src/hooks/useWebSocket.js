@@ -6,7 +6,6 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   const [loading, setLoading] = useState(true);
   const [candleData, setCandleData] = useState({});
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  const [isReconnecting, setIsReconnecting] = useState(false);
   const reconnectTimeout = useRef(null);
   const wsRef = useRef(null);
   const initialLoad = useRef(true); // Отслеживаем первую загрузку
@@ -74,19 +73,24 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      return; // Уже подключен
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      return; // Уже подключен или подключается
+    }
+
+    // Закрываем предыдущее соединение, если оно есть
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
     }
 
     try {
-      const wsUrl = `ws://${window.location.hostname}:3001`;
+      const wsUrl = `ws://localhost:3001`;
       const ws = new window.WebSocket(wsUrl);
       wsRef.current = ws;
       
       ws.onopen = () => {
         console.log('🔌 WebSocket connected');
         setReconnectAttempts(0);
-        setIsReconnecting(false);
         
         const paramsChanged =
           prevParams.current.percentileWindow !== appliedPercentileWindow ||
@@ -106,11 +110,10 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
       ws.onclose = (event) => {
         console.log('❌ WebSocket disconnected:', event.reason);
         wsRef.current = null;
-        setIsReconnecting(true);
         
-        // Переподключение с экспоненциальной задержкой
-        if (reconnectAttempts < 5) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+        // Переподключение с экспоненциальной задержкой, но только если не достигли лимита
+        if (reconnectAttempts < 3) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 5000);
           console.log(`🔄 Переподключение через ${delay}ms (попытка ${reconnectAttempts + 1})`);
           
           reconnectTimeout.current = setTimeout(() => {
@@ -119,7 +122,6 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
           }, delay);
         } else {
           console.error('🚫 Максимальное количество попыток переподключения достигнуто');
-          setIsReconnecting(false);
           // НЕ сбрасываем loading, если у нас уже есть данные
           if (initialLoad.current) {
             setLoading(false);
@@ -228,6 +230,12 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
   }, [appliedPercentileWindow, appliedPercentileLevel, processSignalUpdates, checkForNewSignals, reconnectAttempts, updateCandleData, updateSignalsInstant]);
 
   useEffect(() => {
+    console.log('🔧 useWebSocket useEffect triggered:', { 
+      reloadKey, 
+      appliedPercentileWindow, 
+      appliedPercentileLevel 
+    });
+    
     // Проверяем, изменились ли параметры
     const paramsChanged =
       prevParams.current.percentileWindow !== appliedPercentileWindow ||
@@ -246,9 +254,13 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
     // Очищаем предыдущий таймаут
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = null;
     }
     
-    connectWebSocket();
+    // Добавляем небольшую задержку для предотвращения множественных подключений в React Strict Mode
+    const connectTimer = setTimeout(() => {
+      connectWebSocket();
+    }, 50);
     
     // Обновляем предыдущие параметры
     prevParams.current = {
@@ -257,20 +269,21 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
     };
     
     return () => {
+      clearTimeout(connectTimer);
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
       }
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [reloadKey, appliedPercentileWindow, appliedPercentileLevel, connectWebSocket]);
+  }, [reloadKey, appliedPercentileWindow, appliedPercentileLevel]); // Убираем connectWebSocket из deps
 
   return {
     signals,
     loading,
-    candleData,
-    isReconnecting
+    candleData
   };
 };
