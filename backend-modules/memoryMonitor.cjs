@@ -127,7 +127,7 @@ class MemoryMonitor {
                    stats.isWarning ? '⚠️ WARNING' : 
                    '✅ NORMAL';
     
-    console.log(`📊 Memory Status: ${status} | Heap: ${stats.heapUsedMB}/${stats.heapTotalMB}MB | External: ${stats.externalMB}MB | RSS: ${stats.rssMB}MB`);
+    // console.log(`📊 Memory Status: ${status} | Heap: ${stats.heapUsedMB}/${stats.heapTotalMB}MB | External: ${stats.externalMB}MB | RSS: ${stats.rssMB}MB`);
   }
 
   // Обновить пороговые значения

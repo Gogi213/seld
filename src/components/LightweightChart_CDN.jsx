@@ -11,9 +11,17 @@ const LightweightChartCDN = React.memo(({ data, signalMarkers = [], lowVolumeMar
   const [chartReady, setChartReady] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isSafari, setIsSafari] = useState(false);
   
   // Массив для отслеживания созданных line tools
   const lineToolsRef = useRef([]);
+
+  // Обнаружение Safari
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const safari = userAgent.includes('safari') && !userAgent.includes('chrome');
+    setIsSafari(safari);
+  }, []);
 
   // Обработчик изменения размера окна
   useEffect(() => {
@@ -184,20 +192,26 @@ const LightweightChartCDN = React.memo(({ data, signalMarkers = [], lowVolumeMar
       // Свечи на основной шкале с высокой точностью
       seriesRef.current = chartRef.current.addCandlestickSeries({
         priceScaleId: 'right',
-        scaleMargins: { top: 0.2, bottom: 0.25 },
+        scaleMargins: { top: 0.15, bottom: fullscreenMode ? 0.35 : 0.25 },
         priceFormat: { type: 'price', precision: 6, minMove: 0.000001 },
       });
 
-      // Объём на отдельной шкале снизу
+      // Объём на отдельной шкале снизу с улучшенными отступами для мобильных
       volumeSeriesRef.current = chartRef.current.addHistogramSeries({
         color: '#888888',
         priceFormat: { type: 'volume' },
         priceScaleId: 'volume',
-        scaleMargins: { top: 0.8, bottom: 0 },
+        scaleMargins: { 
+          top: fullscreenMode ? 0.75 : 0.8, 
+          bottom: fullscreenMode && isMobile ? (isSafari ? 0.08 : 0.03) : 0 
+        },
       });
 
       chartRef.current.priceScale('volume').applyOptions({
-        scaleMargins: { top: 0.8, bottom: 0 },
+        scaleMargins: { 
+          top: fullscreenMode ? 0.75 : 0.8, 
+          bottom: fullscreenMode && isMobile ? (isSafari ? 0.08 : 0.03) : 0 
+        },
         borderVisible: false,
       });
 

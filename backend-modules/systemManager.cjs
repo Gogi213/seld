@@ -27,8 +27,8 @@ class SystemManager {
       
       // Интервалы обновлений
       symbolsUpdateInterval: options.symbolsUpdateInterval || 5 * 60 * 1000, // каждые 5 минут
-      dataCalculationInterval: options.dataCalculationInterval || 2 * 1000, // каждые 2 секунды
-      broadcastInterval: options.broadcastInterval || 2 * 1000, // каждые 2 секунды
+      dataCalculationInterval: options.dataCalculationInterval || 1 * 1000, // каждую 1 секунду
+      broadcastInterval: options.broadcastInterval || 1 * 1000, // каждую 1 секунду
       
       // Дефолтные настройки сигналов
       defaultPercentileWindow: options.defaultPercentileWindow || 50,
@@ -55,6 +55,7 @@ class SystemManager {
     this.isInitialized = false;
     this.isRunning = false;
     this.lastSignalStates = new Map(); // symbol -> {1m: bool, 5m: bool} для трекинга новых сигналов
+    this.signalCheckCooldowns = new Map(); // symbol -> timestamp для дебаунсинга
   }
 
   /**
@@ -107,8 +108,8 @@ class SystemManager {
         botToken: process.env.TELEGRAM_BOT_TOKEN || '7669528584:AAEz-BE8fs7v5Eq1ema3AD0n2wvejNm9ibw',
         chatId: process.env.TELEGRAM_CHAT_ID || '-1002565633603', // Ваш Chat ID
         threadId: process.env.TELEGRAM_THREAD_ID || '4294969041', // Thread ID вашей темы
-        enabledTimeframes: ['1m', '5m'],
-        signalCooldown: 15000 // 15 секунд между одинаковыми сигналами (было 30000)
+        enabledTimeframes: ['1m', '5m']
+        // Убрали signalCooldown - отправляем сигналы без задержек
       });
       
       // Настройка обработчиков событий
@@ -228,12 +229,9 @@ class SystemManager {
         this.webSocketServer.broadcastSymbolUpdate(symbol);
       }
       
-      // КРИТИЧЕСКИ ВАЖНО: Проверяем сигналы для Telegram ТОЛЬКО когда свеча закрывается!
-      // Это гарантирует отправку зеленых (свежих) сигналов, а не желтых (протухших)
-      if (kline.x === true) {
-        console.log(`🕐 Candle closed for ${symbol}, checking signals...`);
-        this._checkTelegramSignals(symbol);
-      }
+      // Проверяем Telegram сигналы на каждом обновлении для мгновенной доставки
+      // Дебаунсинг защитит от дублирования
+      this._checkTelegramSignalsWithDebounce(symbol);
     });
     
     console.log('📡 Event handlers configured');
@@ -269,6 +267,14 @@ class SystemManager {
     this.cleanupTimer = setInterval(() => {
       try {
         this.performMaintenanceCleanup();
+        
+        // Принудительная очистка памяти каждые 10 минут
+        if (global.gc) {
+          console.log('🗑️ Running manual garbage collection...');
+          global.gc();
+          const memUsage = process.memoryUsage();
+          console.log(`💾 Memory after GC: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`);
+        }
       } catch (error) {
         console.error('Error in cleanup task:', error);
       }
@@ -317,7 +323,35 @@ class SystemManager {
       this.signalEngine.cleanupExpiredCache();
     }
     
+    // Умная очистка устаревших состояний сигналов (старше 2 часов)
+    this._cleanupExpiredSignalStates();
+    
     console.log('✅ Maintenance cleanup completed');
+  }
+
+  /**
+   * Очистка устаревших состояний сигналов
+   * @private
+   */
+  _cleanupExpiredSignalStates() {
+    const now = Date.now();
+    const maxAge = 2 * 60 * 60 * 1000; // 2 часа
+    let cleanedCooldowns = 0;
+    
+    // Очищаем только устаревшие кулдауны (старше 2 часов)
+    for (const [symbol, timestamp] of this.signalCheckCooldowns.entries()) {
+      if (now - timestamp > maxAge) {
+        this.signalCheckCooldowns.delete(symbol);
+        cleanedCooldowns++;
+      }
+    }
+    
+    // Состояния сигналов НЕ очищаем - они нужны для предотвращения дублей
+    // Они очистятся только при критической нехватке памяти
+    
+    if (cleanedCooldowns > 0) {
+      console.log(`🧹 Cleaned ${cleanedCooldowns} expired signal cooldowns`);
+    }
   }
 
   /**
@@ -343,6 +377,11 @@ class SystemManager {
       if (this.dataManager) {
         this.dataManager.preCalculatedData = null;
       }
+      
+      // ВАЖНО: Очищаем состояния сигналов для предотвращения дублирования
+      this.lastSignalStates.clear();
+      this.signalCheckCooldowns.clear();
+      console.log('🧹 Cleared signal states and cooldowns to prevent duplicates');
       
     } else if (level === 'warning') {
       // Мягкая очистка при предупреждающем уровне
@@ -382,6 +421,23 @@ class SystemManager {
   }
 
   /**
+   * Проверка сигналов с дебаунсингом (ограничение частоты)
+   * @private
+   */
+  async _checkTelegramSignalsWithDebounce(symbol) {
+    const now = Date.now();
+    const lastCheck = this.signalCheckCooldowns.get(symbol) || 0;
+    
+    // Минимальный дебаунсинг 1 секунда - только для защиты от спама
+    if (now - lastCheck < 1000) {
+      return;
+    }
+    
+    this.signalCheckCooldowns.set(symbol, now);
+    await this._checkTelegramSignals(symbol);
+  }
+
+  /**
    * Проверка и отправка сигналов в Telegram
    * @private
    */
@@ -392,18 +448,20 @@ class SystemManager {
 
     try {
       // Получаем данные символа
-      const symbolData = this.dataManager.generateSymbolData(
+      const symbolDataResult = this.dataManager.generateSymbolData(
         symbol,
         this.dataManager.defaultSettings.percentileWindow,
         this.dataManager.defaultSettings.percentileLevel
       );
 
-      if (!symbolData || !symbolData.signal) {
+      if (!symbolDataResult || !symbolDataResult.signal) {
         return;
       }
 
-      const signalData = symbolData.signal;
-      
+      // ПРАВИЛЬНАЯ СТРУКТУРА: signal содержит все данные включая NATR!
+      const symbolData = symbolDataResult.signal;
+      const signalData = symbolData; // signal уже содержит все поля
+
       // Получаем последнее состояние сигналов для этого символа
       const lastStates = this.lastSignalStates.get(symbol) || { '1m': false, '5m': false };
       const currentStates = { '1m': false, '5m': false };
@@ -413,23 +471,30 @@ class SystemManager {
         const hasActiveSignal = signalData[`percentileSignal_${timeframe}`];
         const hasExpiredSignal = signalData[`percentileSignalExpired_${timeframe}`];
         
-        // Обновляем текущее состояние
+        // Обновляем текущее состояние - ТОЛЬКО зеленые сигналы
         currentStates[timeframe] = hasActiveSignal && !hasExpiredSignal;
         
-        // Отправляем только НОВЫЕ активные сигналы (которых не было в прошлый раз)
-        const isNewSignal = currentStates[timeframe] && !lastStates[timeframe];
-        
-        if (isNewSignal) {
-          console.log(`🔥 NEW ${timeframe} signal detected for ${symbol}!`);
+        // ТОЛЬКО если сигнал активен - проверяем, новый ли он
+        if (currentStates[timeframe]) {
+          const isNewSignal = !lastStates[timeframe];
           
-          // Передаем полные данные символа
-          const fullData = {
-            symbol: symbol,
-            ...symbolData,
-            ...signalData // объединяем данные сигнала
-          };
-          
-          await this.telegramBot.sendSignal(fullData, timeframe);
+          // Логируем только НОВЫЕ сигналы, чтобы не спамить
+          if (isNewSignal) {
+            // NATR фильтр для 1m сигналов - блокируем низковолатильные
+            if (timeframe === '1m') {
+              const natr = symbolData.natr30m || 0;
+              
+              if (natr < 0.8) {
+                console.log(`🚫 FILTERED ${timeframe} SIGNAL: ${symbol} - NATR ${natr.toFixed(2)}% < 0.8%`);
+                continue; // Пропускаем этот сигнал
+              }
+            }
+            
+            console.log(`🔥 NEW ${timeframe} SIGNAL: ${symbol} - Rank: ${signalData[`percentileRank_${timeframe}`]?.toFixed(1)}%`);
+            
+            // Передаем полные данные символа - теперь symbolData уже содержит все нужные поля
+            await this.telegramBot.sendSignal(symbolData, timeframe);
+          }
         }
       }
       

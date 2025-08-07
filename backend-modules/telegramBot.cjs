@@ -92,37 +92,23 @@ class TelegramBot {
     });
   }
 
-  // Проверка, нужно ли отправлять сигнал (антиспам)
+  // Проверка, нужно ли отправлять сигнал (без кулдауна - отправляем все сигналы)
   shouldSendSignal(symbol, timeframe) {
-    const key = `${symbol}_${timeframe}`;
-    const lastSent = this.lastSentSignals.get(key);
-    const now = Date.now();
-    
-    if (!lastSent || (now - lastSent) > this.signalCooldown) {
-      this.lastSentSignals.set(key, now);
-      return true;
-    }
-    
-    return false;
+    // Убираем кулдаун - отправляем все свежие сигналы сразу
+    return true;
   }
 
   // Форматирование сигнала для Telegram (очень короткое)
   formatSignal(symbolData, timeframe) {
     const symbol = symbolData.symbol;
     
-    // Проверяем, что сигнал активен И НЕ протух
-    const hasActiveSignal = symbolData[`percentileSignal_${timeframe}`];
-    const hasExpiredSignal = symbolData[`percentileSignalExpired_${timeframe}`];
+    // systemManager уже передает только зеленые сигналы, не нужно дополнительно проверять
     
-    if (!hasActiveSignal || hasExpiredSignal) {
-      return null; // Не отправляем протухшие или неактивные сигналы
-    }
-
     // Убираем USDT из названия символа
     const cleanSymbol = symbol.replace('USDT', '');
     
     // Добавляем NATR и Daily Volume
-    const natr = symbolData.natr ? symbolData.natr.toFixed(2) : '0.00';
+    const natr = symbolData.natr30m ? symbolData.natr30m.toFixed(2) : '0.00';
     const dailyVolumeM = symbolData.dailyVolume ? Math.round(symbolData.dailyVolume / 1000000) : 0;
     
     return `${cleanSymbol} ${timeframe} NATR:${natr} DV:${dailyVolumeM}M`;
@@ -130,25 +116,39 @@ class TelegramBot {
 
   // Отправка одного сигнала
   async sendSignal(symbolData, timeframe) {
+    console.log(`📊 TelegramBot.sendSignal() called: ${symbolData.symbol} ${timeframe}`);
+    
     if (!this.enabledTimeframes.includes(timeframe)) {
+      console.log(`❌ Timeframe ${timeframe} not enabled`);
       return { success: false, error: `Timeframe ${timeframe} not enabled` };
     }
 
-    if (!this.shouldSendSignal(symbolData.symbol, timeframe)) {
-      return { success: false, error: 'Signal cooldown active' };
+    // Защита от дублирования - проверяем, не отправляли ли мы уже этот сигнал недавно
+    const signalKey = `${symbolData.symbol}_${timeframe}`;
+    const now = Date.now();
+    const lastSent = this.lastSentSignals.get(signalKey) || 0;
+    
+    console.log(`🕒 Timing check for ${signalKey}: now=${now}, lastSent=${lastSent}, diff=${now - lastSent}ms`);
+    
+    // Защита от дублирования - 10 секунд достаточно
+    if (now - lastSent < 10000) {
+      console.log(`🚫 DUPLICATE BLOCKED: ${timeframe} signal for ${symbolData.symbol} (sent ${Math.round((now - lastSent)/1000)}s ago)`);
+      return { success: false, error: 'Duplicate signal filtered' };
     }
 
+    console.log(`🚀 SENDING ${timeframe} signal for ${symbolData.symbol} (last sent ${lastSent ? Math.round((now - lastSent)/1000) + 's ago' : 'never'})`);
+    
     const message = this.formatSignal(symbolData, timeframe);
-    if (!message) {
-      return { success: false, error: 'No signal to send' };
-    }
-
+    console.log(`📤 Message to send: "${message}"`);
+    
     const result = await this.sendMessage(message);
     
     if (result.success) {
-      console.log(`📱 Sent ${timeframe} signal for ${symbolData.symbol} to Telegram`);
+      // Записываем время отправки для защиты от дубликатов
+      this.lastSentSignals.set(signalKey, now);
+      console.log(`✅ SENT ${timeframe} signal for ${symbolData.symbol} to Telegram (stored timestamp: ${now})`);
     } else {
-      console.error(`❌ Failed to send ${timeframe} signal for ${symbolData.symbol}:`, result.error);
+      console.error(`❌ FAILED to send ${timeframe} signal for ${symbolData.symbol}:`, result.error);
     }
 
     return result;
