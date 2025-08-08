@@ -122,10 +122,10 @@
     height: 100dvh;
     overflow: hidden;
     padding: 0;
-    padding-top: env(safe-area-inset-top, 0);
-    padding-bottom: env(safe-area-inset-bottom, 0);
-    padding-left: env(safe-area-inset-left, 0);
-    padding-right: env(safe-area-inset-right, 0);
+    padding-top: max(0px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
   }
   
   body {
@@ -136,6 +136,47 @@
   
   html {
     overflow: hidden;
+  }
+}
+
+/* Дополнительные стили для полноэкранного графика */
+.fullscreen-chart {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 9999 !important;
+  background: #000 !important;
+  
+  /* Safari-специфичные стили */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Chrome-специфичные стили */
+  padding-top: max(0px, env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: max(0px, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(0px, env(safe-area-inset-right, 0px)) !important;
+}
+
+/* Safari-специфичные медиа-запросы */
+@supports (-webkit-touch-callout: none) {
+  .fullscreen-chart {
+    /* В Safari дополнительно обрабатываем объёмы */
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+  }
+  
+  /* Дополнительные отступы для элементов управления в Safari */
+  .fullscreen-chart .chart-controls {
+    bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+  }
+}
+
+/* Chrome на Android - более компактные отступы */
+@media (max-width: 768px) and (not (-webkit-touch-callout: none)) {
+  .fullscreen-chart {
+    padding-bottom: max(5px, env(safe-area-inset-bottom, 5px)) !important;
   }
 }
 

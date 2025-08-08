@@ -31,6 +31,7 @@ const FullScreenChartView = ({
 
   return (
     <div
+      className="fullscreen-chart"
       style={{
         position: 'fixed',
         top: 0,
@@ -42,12 +43,15 @@ const FullScreenChartView = ({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        // Безопасная область для полноэкранного режима
-        paddingTop: 'env(safe-area-inset-top, 0)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0)',
-        paddingLeft: 'env(safe-area-inset-left, 0)',
-        paddingRight: 'env(safe-area-inset-right, 0)',
-        boxSizing: 'border-box'
+        // Универсальная безопасная область для всех браузеров
+        paddingTop: 'max(0px, env(safe-area-inset-top, 0px))',
+        paddingBottom: 'max(0px, env(safe-area-inset-bottom, 0px))',
+        paddingLeft: 'max(0px, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(0px, env(safe-area-inset-right, 0px))',
+        boxSizing: 'border-box',
+        // Дополнительная защита для Safari
+        minHeight: '100vh',
+        minHeight: '100dvh' // Динамическая высота viewport
       }}
       onDoubleClick={handleDoubleClick}
       title="Выйти из полноэкранного режима (двойной клик)"
