@@ -81,7 +81,40 @@ class SymbolManager {
         if (!ticker) continue;
         
         const dailyVolume = parseFloat(ticker.quoteVolume);
-        if (dailyVolume < this.minDailyVolume) continue;
+        
+        // Основная фильтрация - минимальный объем
+        if (dailyVolume < this.minDailyVolume) {
+          // Исключение: пропускаем монеты с объемом 80-200млн если их NATR >= 0.8%
+          if (dailyVolume >= 80000000 && dailyVolume <= 200000000) {
+            try {
+              // Получаем исторические данные для расчета NATR
+              const historicalKlines = await this.binanceApi.getHistoricalKlines(symbol, 4000);
+              if (historicalKlines.length >= 30) {
+                const natr = this.binanceApi.calculateNATR(historicalKlines, 30);
+                
+                if (natr >= 0.8) {
+                  console.log(`🎯 EXCEPTION: Adding ${symbol} (Volume: ${Math.round(dailyVolume/1000000)}M, NATR: ${natr.toFixed(2)}%)`);
+                  
+                  newActiveSymbols.add(symbol);
+                  newSymbolsData.set(symbol, {
+                    dailyVolume,
+                    natr30m: natr,
+                    lastUpdate: Date.now()
+                  });
+                  
+                  // Предзагружаем исторические данные
+                  for (const candle of historicalKlines) {
+                    this.candleAggregator.addMinuteCandle(symbol, candle);
+                  }
+                  continue; // Переходим к следующему символу
+                }
+              }
+            } catch (error) {
+              console.error(`Error processing exception ${symbol}:`, error.message);
+            }
+          }
+          continue; // Пропускаем если не прошел основную фильтрацию и исключение
+        }
         
         try {
           // Получаем исторические данные для расчета NATR

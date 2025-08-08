@@ -84,7 +84,13 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
     }
 
     try {
-      const wsUrl = `ws://localhost:3001`;
+      // Автоматически определяем WebSocket URL на основе текущего хоста
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const port = '3001';
+      const wsUrl = `${protocol}//${host}:${port}`;
+      
+      console.log(`🔌 Подключаемся к WebSocket: ${wsUrl}`);
       const ws = new window.WebSocket(wsUrl);
       wsRef.current = ws;
       

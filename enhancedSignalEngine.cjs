@@ -100,12 +100,12 @@ class EnhancedSignalEngine {
   calculateSignalsForSymbol(symbol) {
     const currentTime = Date.now();
     
-    // Проверяем кэш
+    // Проверяем кэш - сократили время кэширования с 30 до 5 секунд для более быстрых обновлений
     const cached = this.signalCache.get(symbol);
     const lastUpdate = this.lastUpdateTime.get(symbol);
     
-    // Используем кэш, если он свежий (менее 30 секунд)
-    if (cached && lastUpdate && (currentTime - lastUpdate < 30000)) {
+    // Используем кэш, если он свежий (менее 5 секунд)
+    if (cached && lastUpdate && (currentTime - lastUpdate < 5000)) {
       return cached;
     }
     
@@ -220,7 +220,10 @@ class EnhancedSignalEngine {
     const intervalMs = this.getIntervalMs(timeframe);
     const signalAge = currentTime - (lastCandleTime + intervalMs);
     const expireTime = intervalMs * expireSettings.expirePeriods;
-    const isCurrentExpired = currentHasSignal && signalAge > expireTime;
+    
+    // Для свежезакрытых свечей даем "буферное время" 30 секунд, чтобы сигнал не сразу стал протухшим
+    const bufferTime = 30000; // 30 секунд буфер
+    const isCurrentExpired = currentHasSignal && signalAge > (expireTime + bufferTime);
     
     // Заполняем результат
     signals[`percentileRank_${timeframe}`] = percentileRank;
@@ -286,7 +289,7 @@ class EnhancedSignalEngine {
   }
 
   // Проверить, нужно ли обновить сигналы
-  shouldUpdateSignals(symbol, maxAge = 30000) { // 30 секунд
+  shouldUpdateSignals(symbol, maxAge = 5000) { // 5 секунд для быстрых обновлений
     const lastUpdate = this.lastUpdateTime.get(symbol);
     if (!lastUpdate) return true;
     

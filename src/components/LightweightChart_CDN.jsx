@@ -11,9 +11,17 @@ const LightweightChartCDN = React.memo(({ data, signalMarkers = [], lowVolumeMar
   const [chartReady, setChartReady] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isSafari, setIsSafari] = useState(false);
   
   // Массив для отслеживания созданных line tools
   const lineToolsRef = useRef([]);
+
+  // Обнаружение Safari
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const safari = userAgent.includes('safari') && !userAgent.includes('chrome');
+    setIsSafari(safari);
+  }, []);
 
   // Обработчик изменения размера окна
   useEffect(() => {

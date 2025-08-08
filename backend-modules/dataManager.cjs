@@ -51,7 +51,7 @@ class DataManager {
     if (activeSymbols.length === 0) return;
     
     try {
-      console.log('🔄 Pre-calculating signals for all symbols...');
+      // console.log('🔄 Pre-calculating signals for all symbols...');
       const startTime = Date.now();
       
       // Рассчитываем данные с дефолтными настройками
@@ -62,7 +62,7 @@ class DataManager {
       this.lastDataCalculation = Date.now();
       
       const calculationTime = Date.now() - startTime;
-      console.log(`✅ Pre-calculated data for ${activeSymbols.length} symbols in ${calculationTime}ms`);
+      // console.log(`✅ Pre-calculated data for ${activeSymbols.length} symbols in ${calculationTime}ms`);
       
       return this.preCalculatedData;
       
@@ -77,7 +77,7 @@ class DataManager {
    */
   generateClientData(percentileWindow, percentileLevel) {
     try {
-      console.log(`🔧 Generating client data for ${percentileWindow}w/${percentileLevel}%`);
+      // console.log(`🔧 Generating client data for ${percentileWindow}w/${percentileLevel}%`);
       
       // Обновляем настройки движка сигналов
       this.signalEngine.updateSettings({
@@ -89,7 +89,7 @@ class DataManager {
       const candleData = {};
       const activeSymbols = this.symbolManager.getActiveSymbols();
       
-      console.log(`📊 Processing ${activeSymbols.length} active symbols`);
+      // console.log(`📊 Processing ${activeSymbols.length} active symbols`);
       
       // Рассчитываем сигналы для всех активных символов
       for (const symbol of activeSymbols) {
@@ -128,7 +128,7 @@ class DataManager {
       // Сортируем результаты по NATR
       results.sort((a, b) => (b.natr30m || 0) - (a.natr30m || 0));
       
-      console.log(`✅ Generated data for ${results.length} symbols`);
+      // console.log(`✅ Generated data for ${results.length} symbols`);
       
       return {
         signals: results,
