@@ -125,7 +125,7 @@ class WebSocketServer {
       }
       
       // Иначе рассчитываем на лету
-      console.log('🔄 Calculating custom data for new client');
+      // console.log('🔄 Calculating custom data for new client');
       const data = this.dataManager.generateClientData(settings.percentileWindow, settings.percentileLevel);
       this._sendToClient(ws, {
         type: 'full_update',

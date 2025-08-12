@@ -2,14 +2,11 @@
   "name": "seld",
   "private": true,
   "version": "0.0.0",
-  "main": "main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "concurrently \"npm:dev\" \"npm:wait-electron\" \"npm:backend\"",
-    "wait-electron": "wait-on http://localhost:3000 && electron .",
-    "electron": "electron .",
-    "backend": "node --max-old-space-size=1024 --expose-gc backend-refactored.cjs",
+    "start": "concurrently \"npm:dev\" \"npm:backend\"",
+    "backend": "node --max-old-space-size=2048 --max-semi-space-size=128 --optimize-for-size --expose-gc backend-refactored.cjs",
     "backend-old": "node backend.cjs",
     "build": "vite build",
     "lint": "eslint .",
@@ -28,12 +25,10 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
     "concurrently": "^9.2.0",
-    "electron": "^37.2.0",
     "eslint": "^9.29.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.2.0",
-    "vite": "^7.0.0",
-    "wait-on": "^8.0.3"
+    "vite": "^7.0.0"
   }
 }

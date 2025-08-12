@@ -5,7 +5,7 @@ module.exports = {
   // Фильтрация символов
   FILTERS: {
     MIN_DAILY_VOLUME: 200000000, // млн суточного объёма
-    MIN_NOTIONAL: 0.4, // 0.4 NATR
+  MIN_NOTIONAL: 0.45, // 0.45 NATR
     MIN_HISTORICAL_CANDLES: 30, // минимум свечей для расчета NATR
     HISTORICAL_CANDLES_LIMIT: 4000, // количество исторических свечей для загрузки
     NATR_CALCULATION_PERIOD: 30 // период для расчета NATR
