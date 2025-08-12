@@ -248,12 +248,13 @@ export const useWebSocket = (appliedPercentileWindow, appliedPercentileLevel, re
       prevParams.current.percentileLevel !== appliedPercentileLevel;
     
     // Сбрасываем loading только если это первая загрузка или изменились параметры
-    if (initialLoad.current || paramsChanged) {
+    // НО НЕ при обычном reloadKey (возврат на страницу)
+    if (initialLoad.current || (paramsChanged && reloadKey === 0)) {
       setLoading(true);
     }
     
-    // Очищаем сигналы только если изменились параметры
-    if (paramsChanged) {
+    // Очищаем сигналы только если изменились параметры, НЕ при простом reloadKey
+    if (paramsChanged && reloadKey === 0) {
       setSignals([]);
     }
     

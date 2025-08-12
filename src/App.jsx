@@ -64,32 +64,7 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Обработка блокировки/разблокировки экрана
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Страница стала видимой - логируем но НЕ пересоздаем WebSocket
-        console.log('📱 Страница стала видимой');
-        // setReloadKey(prev => prev + 1); // Убираем пересоздание WS
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Также обрабатываем фокус/расфокус окна
-    const handleFocus = () => {
-      console.log('📱 Окно получило фокус');
-      // Убираем автоматическое обновление при фокусе
-      // setReloadKey(prev => prev + 1);
-    };
-
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
+  // УБИРАЕМ обработку visibilitychange и focus чтобы избежать нежелательных сбросов
 
   // Хуки
   const { soundEnabled, setSoundEnabled, checkForNewSignals, audioInitialized, initializeAudio } = useSignalSound();
